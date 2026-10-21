@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="text-center py-5">
+    <h1 class="display-5 fw-bold">Welcome to Smart English Learning</h1>
+    <p class="lead mb-4">Your AI-powered personal tutor for Writing, Reading, and Vocabulary.</p>
+    
+    {% if not user.is_authenticated %}
+        <a href="{% url 'login' %}" class="btn btn-primary btn-lg px-4">Login to Start</a>
+    {% else %}
+        <div class="alert alert-success mt-3" role="alert">
+            You are logged in! AI features are coming soon...
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
