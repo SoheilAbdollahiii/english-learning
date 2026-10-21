@@ -100,5 +100,5 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Login & Logout settings
-LOGIN_REDIRECT_URL = 'home'
+LOGIN_REDIRECT_URL = 'dashboard' # تغییر کرد
 LOGOUT_REDIRECT_URL = 'home'
