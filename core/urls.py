@@ -8,4 +8,5 @@ urlpatterns = [
     path('accounts/', include('django.contrib.auth.urls')),
     # صفحه اصلی سایت
     path('', TemplateView.as_view(template_name='home.html'), name='home'),
+    path('writing/', include('writing.urls')), 
 ]

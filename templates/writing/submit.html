@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <h2 class="mb-4">Writing Practice</h2>
+        
+        <form method="post" class="mb-4">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label for="text" class="form-label">Write a short English paragraph:</label>
+                <textarea name="text" id="text" class="form-control" rows="6" required>{{ user_text }}</textarea>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Analyze & Correct</button>
+        </form>
+
+        <!-- نمایش خطاهای سیستمی (مثلا قطعی اینترنت) -->
+        {% if error_message %}
+            <div class="alert alert-danger">
+                <strong>System Error:</strong> {{ error_message }}
+            </div>
+        {% endif %}
+
+        <!-- نمایش بازخورد هوش مصنوعی -->
+        {% if corrections is not None %}
+            <h4 class="mt-5 mb-3">AI Feedback</h4>
+            
+            {% if corrections|length > 0 %}
+                <div class="list-group">
+                {% for item in corrections %}
+                    <div class="list-group-item list-group-item-action mb-2 border rounded">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1 text-danger"><s>{{ item.error }}</s></h6>
+                            <h6 class="text-success fw-bold">{{ item.correction }}</h6>
+                        </div>
+                        <p class="mb-1 mt-2 text-muted">
+                            <strong>Reason:</strong> {{ item.reason }}
+                        </p>
+                    </div>
+                {% endfor %}
+                </div>
+            {% else %}
+                <div class="alert alert-success">
+                    Excellent! No grammatical errors found in your text.
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -26,6 +26,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Third-party apps
     'rest_framework',
+    'writing',
+    'rag', 
+    'vocabulary', 
+    'reading',   
 ]
 
 MIDDLEWARE = [
