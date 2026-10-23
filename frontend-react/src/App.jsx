@@ -546,15 +546,16 @@ export default function App() {
 
   const handleSentenceClick = async (sentence) => {
     const cleanedSentence = sentence.trim().slice(0, 400)
-    if (!cleanedSentence) return
-    setReadingLookup({ term: '', sentence: cleanedSentence, data: null })
+    const firstWord = cleanedSentence.match(/[a-zA-Z'-]+/)?.[0]?.toLowerCase() || ''
+    if (!cleanedSentence || !firstWord) return
+    setReadingLookup({ term: firstWord, sentence: cleanedSentence, data: null })
     setReadingLookupBusy(true)
     setReadingLookupError('')
     setReadingLookupSaved(false)
     try {
       const res = await apiFetch(apiUrl('/reading/api/lookup/'), {
         method: 'POST',
-        body: JSON.stringify({ term: '', sentence: cleanedSentence })
+        body: JSON.stringify({ term: firstWord, sentence: cleanedSentence })
       })
       const data = await res.json()
       if (!res.ok) {
