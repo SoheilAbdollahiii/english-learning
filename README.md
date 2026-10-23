@@ -88,3 +88,20 @@ See `.env.example` for the environment variables. In production, use a strong se
 ## CI checks
 
 GitHub Actions checks Django configuration, migration consistency, backend tests, dependency consistency, and the React production build for pull requests and pushes to `main`.
+
+
+## Deployment configuration
+
+The React app does not assume that the Django API runs on the same machine as the learner's browser.
+
+- For local development, the frontend defaults to `http://127.0.0.1:8000`.
+- For a same-origin deployment (frontend and API served behind the same domain), leave `VITE_API_BASE_URL` unset in the production build.
+- For a separate API origin, set `VITE_API_BASE_URL` to the public API origin before building the frontend, for example `https://api.example.com` (replace this example with your actual API URL).
+- Add the frontend's public origin to Django's `CORS_ALLOWED_ORIGINS`, and configure `ALLOWED_HOSTS` for the API host. Do not use wildcard origins for authenticated production traffic.
+- Keep `SECRET_KEY` and `GROQ_API_KEY` on the server only. Never put either secret in a `VITE_*` variable or commit a real `.env` file.
+
+### Product-readiness notes
+
+- The dashboard's streak now counts consecutive days with saved quiz activity. It is not a count of logins, and currently measures quiz sessions rather than every possible learning action.
+- Before public launch, configure HTTPS and review Django's deployment checks, token storage/XSS exposure, rate limits for authentication and AI correction, backups, privacy/retention terms, monitoring, and the current npm audit findings.
+- A passing CI build validates the automated checks; it does not replace a real-browser acceptance test with a configured API key and production-like environment.
