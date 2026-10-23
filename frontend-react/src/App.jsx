@@ -7,22 +7,6 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '')).replace(/\/$/, '')
 const apiUrl = (path) => `${API_BASE}${path}`
 
-function calculateCurrentStreak(sessions = []) {
-  // Count real quiz activity, not page visits or values stored in the browser.
-  const dateKey = (date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
-  const activeDays = new Set(sessions.map((session) => dateKey(new Date(session.created_at))))
-  const start = new Date()
-  if (!activeDays.has(dateKey(start))) start.setDate(start.getDate() - 1)
-  if (!activeDays.has(dateKey(start))) return 0
-
-  let streak = 0
-  while (activeDays.has(dateKey(start))) {
-    streak += 1
-    start.setDate(start.getDate() - 1)
-  }
-  return streak
-}
-
 async function apiFetch(url, options = {}) {
   let token = localStorage.getItem('access_token');
   
@@ -80,6 +64,7 @@ export default function App() {
   const [personalWords, setPersonalWords] = useState([])
   const [readingProgress, setReadingProgress] = useState([])
   const [quizHistory, setQuizHistory] = useState([])
+  const [quizStats, setQuizStats] = useState({ current_streak: 0, quiz_sessions_total: 0, daily_activity: [] })
   const [preferences, setPreferences] = useState({ preferred_level: 'B1', daily_word_goal: 10, learning_goal: 'general' })
   const [preferencesSaving, setPreferencesSaving] = useState(false)
   const [readingQuery, setReadingQuery] = useState('')
@@ -109,21 +94,21 @@ export default function App() {
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [isRegistering, setIsRegistering] = useState(false)
 
-  const streak = useMemo(() => calculateCurrentStreak(quizHistory), [quizHistory])
+  const streak = quizStats.current_streak || 0
   const chartData = useMemo(() => {
     const daysFa = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه']
     const daysEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
     const currentDays = i18n.language === 'fa' ? daysFa : daysEn
+    const activityByDate = new Map((quizStats.daily_activity || []).map((item) => [item.date, item.count]))
     const data = []
     for (let i = 6; i >= 0; i--) {
       const day = new Date()
       day.setDate(day.getDate() - i)
-      const dayKey = day.toDateString()
-      const activity = quizHistory.filter((session) => new Date(session.created_at).toDateString() === dayKey).length
-      data.push({ name: currentDays[day.getDay()], activity })
+      const dayKey = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
+      data.push({ name: currentDays[day.getDay()], activity: activityByDate.get(dayKey) || 0 })
     }
     return data
-  }, [i18n.language, quizHistory])
+  }, [i18n.language, quizStats.daily_activity])
 
   useEffect(() => {
     document.documentElement.lang = i18n.language === 'fa' ? 'fa' : 'en'
@@ -210,18 +195,19 @@ export default function App() {
       setLoading(true)
       try {
         if (activeTab === 'dashboard') {
-          const [wordsRes, personalRes, articlesRes, writingsRes, preferencesRes, progressRes, historyRes] = await Promise.all([
+          const [wordsRes, personalRes, articlesRes, writingsRes, preferencesRes, progressRes, historyRes, statsRes] = await Promise.all([
             apiFetch(apiUrl('/vocabulary/api/words/')),
             apiFetch(apiUrl('/vocabulary/api/my-words/')),
             apiFetch(apiUrl('/reading/api/articles/')),
             apiFetch(apiUrl('/writing/api/writings/')),
             apiFetch(apiUrl('/learning/api/preferences/')),
             apiFetch(apiUrl('/reading/api/progress/')),
-            apiFetch(apiUrl('/quiz/api/history/'))
+            apiFetch(apiUrl('/quiz/api/history/')),
+            apiFetch(apiUrl('/quiz/api/stats/'))
           ])
-          const [wordsData, personalData, articlesData, writingsData, preferencesData, progressData, historyData] = await Promise.all([
+          const [wordsData, personalData, articlesData, writingsData, preferencesData, progressData, historyData, statsData] = await Promise.all([
             wordsRes.json(), personalRes.json(), articlesRes.json(), writingsRes.json(),
-            preferencesRes.json(), progressRes.json(), historyRes.json()
+            preferencesRes.json(), progressRes.json(), historyRes.json(), statsRes.json()
           ])
           setWords(Array.isArray(wordsData) ? wordsData : [])
           setPersonalWords(Array.isArray(personalData) ? personalData : [])
@@ -234,6 +220,7 @@ export default function App() {
           }
           setReadingProgress(Array.isArray(progressData) ? progressData : [])
           setQuizHistory(Array.isArray(historyData) ? historyData : [])
+          if (statsRes.ok) setQuizStats(statsData)
         } else if (activeTab === 'reading') {
           const [articlesRes, progressRes] = await Promise.all([
             apiFetch(apiUrl('/reading/api/articles/')),
@@ -320,9 +307,13 @@ export default function App() {
       if (res.ok) {
         setQuizResult(resultData)
         setQuizSubmitted(true)
-        const historyRes = await apiFetch(apiUrl('/quiz/api/history/'))
-        const historyData = await historyRes.json()
+        const [historyRes, statsRes] = await Promise.all([
+          apiFetch(apiUrl('/quiz/api/history/')),
+          apiFetch(apiUrl('/quiz/api/stats/'))
+        ])
+        const [historyData, statsData] = await Promise.all([historyRes.json(), statsRes.json()])
         setQuizHistory(Array.isArray(historyData) ? historyData : [])
+        if (statsRes.ok) setQuizStats(statsData)
       } else {
         alert(resultData.detail || t('quiz_submit_failed'))
       }
