@@ -180,6 +180,151 @@ def check_quiz_answer(request):
     return Response(payload)
 
 
+
+
+def build_performance_analysis(details, duration_seconds, previous_sessions):
+    """Build a persisted, explainable learning report from graded answer details."""
+    topic_stats = {}
+    mistake_counts = {}
+    for item in details:
+        topic = (item.get("topic") or item.get("quiz_type") or "general").strip() or "general"
+        stats = topic_stats.setdefault(topic, {"topic": topic, "attempted": 0, "correct": 0})
+        stats["attempted"] += 1
+        if item.get("is_correct"):
+            stats["correct"] += 1
+        else:
+            mistake = item.get("common_mistake") or item.get("explanation") or "Review this question's explanation."
+            record = mistake_counts.setdefault(mistake, {"mistake": mistake, "count": 0, "topic": topic, "examples": []})
+            record["count"] += 1
+            if len(record["examples"]) < 3:
+                record["examples"].append(item.get("question_text", ""))
+
+    breakdown = []
+    for stats in topic_stats.values():
+        stats["accuracy"] = round(stats["correct"] * 100 / stats["attempted"]) if stats["attempted"] else 0
+        breakdown.append(stats)
+    breakdown.sort(key=lambda item: (-item["accuracy"], -item["attempted"], item["topic"]))
+    strengths = [
+        {"topic": item["topic"], "accuracy": item["accuracy"], "correct": item["correct"], "attempted": item["attempted"]}
+        for item in breakdown if item["accuracy"] >= 70
+    ]
+    weaknesses = sorted(
+        [item for item in breakdown if item["accuracy"] < 70],
+        key=lambda item: (item["accuracy"], -item["attempted"], item["topic"]),
+    )
+    common_mistakes = sorted(mistake_counts.values(), key=lambda item: (-item["count"], item["topic"]))[:5]
+    if weaknesses:
+        weakest = weaknesses[0]
+        recommendation = {
+            "topic": weakest["topic"],
+            "quiz_type": weakest["topic"] if weakest["topic"] in QUIZ_TYPES else "mixed",
+            "reason": "This was your lowest-accuracy topic in the latest quiz.",
+            "suggested_question_count": 5,
+        }
+    elif breakdown:
+        strongest = breakdown[0]
+        recommendation = {
+            "topic": strongest["topic"],
+            "quiz_type": strongest["topic"] if strongest["topic"] in QUIZ_TYPES else "mixed",
+            "reason": "Your accuracy is strong across the topics shown. Try a harder follow-up quiz.",
+            "suggested_question_count": 5,
+            "suggested_difficulty": "hard",
+        }
+    else:
+        recommendation = {
+            "topic": "general",
+            "quiz_type": "mixed",
+            "reason": "Complete another quiz to get a more specific practice recommendation.",
+            "suggested_question_count": 5,
+        }
+
+    previous = list(previous_sessions)
+    previous_average = round(sum(
+        (session.score * 100 / session.total_questions) if session.total_questions else 0
+        for session in previous
+    ) / len(previous)) if previous else None
+    current_total = len(details)
+    current_score = sum(1 for item in details if item.get("is_correct"))
+    current_accuracy = round(current_score * 100 / current_total) if current_total else 0
+    previous_latest = previous[0] if previous else None
+    previous_latest_accuracy = (
+        round(previous_latest.score * 100 / previous_latest.total_questions)
+        if previous_latest and previous_latest.total_questions else None
+    )
+    return {
+        "duration_seconds": max(0, int(duration_seconds)),
+        "accuracy": current_accuracy,
+        "topic_breakdown": breakdown,
+        "strengths": strengths,
+        "weaknesses": weaknesses,
+        "common_mistakes": common_mistakes,
+        "comparison": {
+            "previous_quiz_accuracy": previous_latest_accuracy,
+            "change_from_previous_percentage_points": (
+                current_accuracy - previous_latest_accuracy
+                if previous_latest_accuracy is not None else None
+            ),
+            "average_previous_accuracy": previous_average,
+            "previous_quiz_count": len(previous),
+        },
+        "recommended_next_practice": recommendation,
+    }
+
+
+def _session_analysis_payload(session):
+    return {
+        "session_id": session.id,
+        "quiz_type": session.quiz_type,
+        "level": session.level,
+        "score": session.score,
+        "total": session.total_questions,
+        "percentage": round(session.score * 100 / session.total_questions) if session.total_questions else 0,
+        "created_at": session.created_at,
+        "duration_seconds": session.duration_seconds,
+        "topic_breakdown": session.topic_breakdown,
+        "common_mistakes": session.mistake_patterns,
+    }
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def quiz_performance_analysis(request, session_id=None):
+    """Read a learner's saved analysis, never another user's session."""
+    sessions = QuizSession.objects.filter(user=request.user).order_by("-created_at")
+    if session_id is not None:
+        session = sessions.filter(id=session_id).first()
+        if session is None:
+            return Response({"detail": "Quiz session not found."}, status=status.HTTP_404_NOT_FOUND)
+        payload = _session_analysis_payload(session)
+        prior_sessions = list(sessions.filter(created_at__lt=session.created_at)[:10])
+        # Historical reports use the stored snapshot; comparisons are reconstructed from prior attempts.
+        details = []
+        for topic, stats in (session.topic_breakdown or {}).items():
+            for _ in range(stats.get("attempted", 0)):
+                details.append({
+                    "topic": topic,
+                    "quiz_type": topic,
+                    "is_correct": len(details) < stats.get("correct", 0),
+                })
+        payload["analysis"] = build_performance_analysis(details, session.duration_seconds, prior_sessions)
+        payload["analysis"]["topic_breakdown"] = list((session.topic_breakdown or {}).values())
+        payload["analysis"]["common_mistakes"] = session.mistake_patterns or []
+        return Response(payload)
+
+    recent = list(sessions[:10])
+    return Response([
+        {
+            **_session_analysis_payload(session),
+            "comparison": {
+                "previous_quiz_accuracy": (
+                    round(recent[index + 1].score * 100 / recent[index + 1].total_questions)
+                    if index + 1 < len(recent) and recent[index + 1].total_questions else None
+                ),
+            },
+        }
+        for index, session in enumerate(recent)
+    ])
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def submit_quiz(request):
@@ -194,6 +339,14 @@ def submit_quiz(request):
         return Response({"answers": "Submit at least one answer."}, status=status.HTTP_400_BAD_REQUEST)
     if len(answers) > MAX_QUIZ_QUESTIONS:
         return Response({"answers": "Submit no more than 30 answers per quiz."}, status=status.HTTP_400_BAD_REQUEST)
+
+    raw_duration = request.data.get("duration_seconds", 0)
+    try:
+        duration_seconds = int(raw_duration or 0)
+    except (TypeError, ValueError):
+        return Response({"duration_seconds": "Duration must be a non-negative integer."}, status=status.HTTP_400_BAD_REQUEST)
+    if duration_seconds < 0 or duration_seconds > 24 * 60 * 60:
+        return Response({"duration_seconds": "Duration must be between 0 and 86400 seconds."}, status=status.HTTP_400_BAD_REQUEST)
 
     normalized_answers = {}
     for raw_question_id, answer in answers.items():
@@ -234,6 +387,7 @@ def submit_quiz(request):
             "quiz_type": question.quiz_type,
             "level": question.level,
             "difficulty": question.difficulty,
+            "topic": question.topic or question.quiz_type,
             "question_text": question.question_text,
             "user_answer": user_answer,
             "correct_answer": question.correct_option.upper(),
@@ -245,20 +399,30 @@ def submit_quiz(request):
     if total == 0:
         return Response({"answers": "No valid answers were submitted."}, status=status.HTTP_400_BAD_REQUEST)
 
-    QuizSession.objects.create(
+    previous_sessions = list(
+        QuizSession.objects.filter(user=request.user).order_by("-created_at")[:10]
+    )
+    analysis = build_performance_analysis(details, duration_seconds, previous_sessions)
+    session = QuizSession.objects.create(
         user=request.user,
         quiz_type=quiz_type,
         level=level,
         score=score,
         total_questions=total,
+        duration_seconds=duration_seconds,
+        topic_breakdown={item["topic"]: item for item in analysis["topic_breakdown"]},
+        mistake_patterns=analysis["common_mistakes"],
     )
+    analysis["session_id"] = session.id
     return Response({
+        "session_id": session.id,
         "quiz_type": quiz_type,
         "level": level,
         "score": score,
         "total": total,
         "percentage": round((score / total) * 100),
         "details": details,
+        "analysis": analysis,
         "message": "Quiz submitted successfully!",
     }, status=status.HTTP_201_CREATED)
 
