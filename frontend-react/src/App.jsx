@@ -20,6 +20,10 @@ export default function App() {
   const [storyAnswerFeedback, setStoryAnswerFeedback] = useState(null)
   const [storyAnswerBusy, setStoryAnswerBusy] = useState(false)
   const [storyError, setStoryError] = useState('')
+  const [readingLookup, setReadingLookup] = useState(null)
+  const [readingLookupBusy, setReadingLookupBusy] = useState(false)
+  const [readingLookupError, setReadingLookupError] = useState('')
+  const [readingLookupSaved, setReadingLookupSaved] = useState(false)
   const [writings, setWritings] = useState([])
   const [personalWords, setPersonalWords] = useState([])
   const [dueReviewCount, setDueReviewCount] = useState(0)
@@ -513,26 +517,79 @@ export default function App() {
     }
   };
 
-  const handleWordClick = async (word) => {
-    const cleanedWord = word.replace(/^[^a-zA-Z'-]+|[^a-zA-Z'-]+$/g, '').toLowerCase()
-    if (!cleanedWord) return
+  const handleWordClick = async (word, sentence = word) => {
+    const cleanedTerm = word.replace(/^[^a-zA-Z'-]+|[^a-zA-Z'-]+$/g, '').trim().toLowerCase()
+    const cleanedSentence = sentence.trim().slice(0, 400)
+    if (!cleanedTerm || !cleanedSentence) return
+    setReadingLookup({ term: cleanedTerm, sentence: cleanedSentence, data: null })
+    setReadingLookupBusy(true)
+    setReadingLookupError('')
+    setReadingLookupSaved(false)
+    try {
+      const res = await apiFetch(apiUrl('/reading/api/lookup/'), {
+        method: 'POST',
+        body: JSON.stringify({ term: cleanedTerm, sentence: cleanedSentence })
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setReadingLookupError(data.detail || t('reading_lookup_failed'))
+        return
+      }
+      setReadingLookup((current) => current ? { ...current, data } : current)
+    } catch (err) {
+      console.error('Could not look up reading text:', err)
+      setReadingLookupError(t('reading_lookup_failed'))
+    } finally {
+      setReadingLookupBusy(false)
+    }
+  }
+
+  const saveLookupWord = async () => {
+    if (!readingLookup?.term || !readingLookup?.data) return
+    setReadingLookupBusy(true)
+    setReadingLookupError('')
     try {
       const res = await apiFetch(apiUrl('/vocabulary/api/my-words/'), {
         method: 'POST',
-        body: JSON.stringify({ english_word: cleanedWord, level: preferences.preferred_level || 'B1' })
+        body: JSON.stringify({
+          english_word: readingLookup.term,
+          translation: readingLookup.data.translation || '',
+          level: preferences.preferred_level || 'B1'
+        })
       })
       const data = await res.json()
-      if (res.ok) {
-        setPersonalWords((current) => [data, ...current.filter((item) => item.id !== data.id)])
-        loadReviewQueue()
-        alert(t('word_saved', { word: cleanedWord }))
-      } else {
-        alert(t('word_save_failed'))
+      if (!res.ok) {
+        setReadingLookupError(data.detail || t('word_save_failed'))
+        return
       }
+      setPersonalWords((current) => [data, ...current.filter((item) => item.id !== data.id)])
+      setReadingLookupSaved(true)
+      loadReviewQueue()
     } catch (err) {
-      console.error('Error saving personal word:', err)
-      alert(t('word_save_failed'))
+      console.error('Could not save reading lookup:', err)
+      setReadingLookupError(t('word_save_failed'))
+    } finally {
+      setReadingLookupBusy(false)
     }
+  }
+
+  const speakLookupTerm = () => {
+    if (!readingLookup?.term || typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      setReadingLookupError(t('reading_audio_unavailable'))
+      return
+    }
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(readingLookup.term)
+    utterance.lang = 'en-US'
+    utterance.rate = 0.85
+    window.speechSynthesis.speak(utterance)
+  }
+
+  const closeReadingLookup = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel()
+    setReadingLookup(null)
+    setReadingLookupError('')
+    setReadingLookupSaved(false)
   }
 
   const savePreferences = async (event) => {
@@ -990,6 +1047,68 @@ export default function App() {
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
+              </div>
+            )}
+
+            {readingLookup && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-3 sm:p-6" onMouseDown={(event) => { if (event.target === event.currentTarget) closeReadingLookup() }}>
+                <section role="dialog" aria-modal="true" aria-labelledby="reading-lookup-title" className={`max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border shadow-2xl ${darkMode ? 'border-gray-700 bg-gray-900 text-gray-100' : 'border-gray-200 bg-white text-gray-900'}`}>
+                  <header className="flex items-start justify-between gap-4 border-b border-gray-200/20 p-5 sm:p-6">
+                    <div>
+                      <p className="text-xs font-extrabold uppercase tracking-wider text-indigo-500">{t('reading_lookup_eyebrow')}</p>
+                      <h2 id="reading-lookup-title" className="mt-1 text-2xl font-black" dir="ltr">{readingLookup.term}</h2>
+                      <p className={`mt-1 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{readingLookup.data?.term_type === 'phrase' ? t('reading_phrase') : t('reading_word')}</p>
+                    </div>
+                    <button onClick={closeReadingLookup} aria-label={t('close')} className={`rounded-xl p-2 text-xl ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>×</button>
+                  </header>
+                  <div className="space-y-5 p-5 sm:p-6">
+                    {readingLookupBusy && !readingLookup.data ? <div className="flex items-center gap-3 py-8 text-sm"><span className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />{t('reading_lookup_loading')}</div> : null}
+                    {readingLookup.data && (
+                      <>
+                        <section className={`rounded-2xl p-4 ${darkMode ? 'bg-indigo-950/40' : 'bg-indigo-50'}`}>
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold uppercase tracking-wide text-indigo-500">{t('reading_meaning_context')}</p>
+                              {readingLookup.data.translation ? <p className="mt-2 text-lg font-extrabold">{readingLookup.data.translation}</p> : null}
+                              <p className="mt-2 text-sm leading-6" dir="ltr">{readingLookup.data.definition}</p>
+                              {readingLookup.data.part_of_speech ? <p className="mt-1 text-xs opacity-70">{readingLookup.data.part_of_speech}</p> : null}
+                            </div>
+                            <button onClick={speakLookupTerm} className="flex shrink-0 items-center gap-2 rounded-xl border border-indigo-400/40 px-3 py-2 text-sm font-bold hover:bg-indigo-500/10"><span aria-hidden="true">🔊</span>{t('reading_listen')}</button>
+                          </div>
+                        </section>
+                        <section className="space-y-2">
+                          <h3 className="font-extrabold">{t('reading_sentence_translation')}</h3>
+                          <p className={`rounded-xl border p-3 text-sm leading-7 ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}`} dir="ltr">{readingLookup.sentence}</p>
+                          {readingLookup.data.sentence_translation ? <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm leading-7" dir="rtl">{readingLookup.data.sentence_translation}</p> : <p className="text-sm text-amber-500">{t('reading_translation_unavailable')}</p>}
+                        </section>
+                        {(readingLookup.data.example || readingLookup.data.example_translation) && (
+                          <section className="space-y-2">
+                            <h3 className="font-extrabold">{t('reading_another_example')}</h3>
+                            {readingLookup.data.example && <p className="text-sm leading-6" dir="ltr">{readingLookup.data.example}</p>}
+                            {readingLookup.data.example_translation && <p className="text-sm leading-6 opacity-80" dir="rtl">{readingLookup.data.example_translation}</p>}
+                          </section>
+                        )}
+                        {readingLookup.data.related_phrases?.length > 0 && (
+                          <section>
+                            <h3 className="mb-2 font-extrabold">{t('reading_useful_phrases')}</h3>
+                            <div className="flex flex-wrap gap-2">
+                              {readingLookup.data.related_phrases.map((phrase) => (
+                                <button key={phrase.phrase} onClick={() => handleWordClick(phrase.phrase, readingLookup.sentence)} className={`rounded-full border px-3 py-2 text-left text-sm transition hover:border-indigo-500 ${darkMode ? 'border-gray-700 hover:bg-gray-800' : 'border-gray-200 hover:bg-indigo-50'}`}>
+                                  <span className="font-bold" dir="ltr">{phrase.phrase}</span><span className="mx-2 opacity-60">·</span><span dir="rtl">{phrase.translation}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </section>
+                        )}
+                        <div className="flex flex-wrap items-center gap-3 border-t border-gray-200/20 pt-4">
+                          <button onClick={saveLookupWord} disabled={readingLookupBusy || readingLookupSaved} className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-60">{readingLookupSaved ? `✓ ${t('reading_saved')}` : readingLookupBusy ? t('reading_saving') : t('reading_save_word')}</button>
+                          <button onClick={closeReadingLookup} className={`rounded-xl border px-5 py-3 text-sm font-bold ${darkMode ? 'border-gray-700 hover:bg-gray-800' : 'border-gray-200 hover:bg-gray-50'}`}>{t('close')}</button>
+                        </div>
+                      </>
+                    )}
+                    {readingLookupError && <p role="alert" className="rounded-xl bg-red-500/10 p-3 text-sm font-semibold text-red-500">{readingLookupError}</p>}
+                  </div>
+                </section>
               </div>
             )}
 
