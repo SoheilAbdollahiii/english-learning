@@ -1139,7 +1139,7 @@ export default function App() {
                         <div className={`h-2 overflow-hidden rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}><div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${storyProgressPercent}%` }} /></div>
                       </div>
                       <article className={`rounded-2xl border p-5 sm:p-6 ${darkMode ? 'border-gray-700 bg-gray-900/50' : 'border-indigo-100 bg-indigo-50/40'}`}>
-                        <InteractiveText text={activeStoryNode.text} onWordClick={handleWordClick} darkMode={darkMode} />
+                        <InteractiveText text={activeStoryNode.text} onWordClick={handleWordClick} onSentenceClick={handleSentenceClick} darkMode={darkMode} />
                       </article>
                       {activeStoryNode.ending ? (
                         <div className={`rounded-2xl border p-5 ${darkMode ? 'border-emerald-900 bg-emerald-950/30' : 'border-emerald-200 bg-emerald-50'}`}>
@@ -1221,7 +1221,7 @@ export default function App() {
                           <span className="shrink-0 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-600">{article.level}</span>
                         </div>
                         <div className="mb-6 flex-grow text-sm">
-                          <InteractiveText text={article.content} onWordClick={handleWordClick} darkMode={darkMode} />
+                          <InteractiveText text={article.content} onWordClick={handleWordClick} onSentenceClick={handleSentenceClick} darkMode={darkMode} />
                         </div>
                         <div className="mt-auto border-t pt-4 dark:border-gray-700">
                           {readingProgress.some((item) => item.article_id === article.id && item.completed) ? (
@@ -1788,28 +1788,40 @@ export default function App() {
   )
 }
 
-function InteractiveText({ text, onWordClick, darkMode }) {
+function InteractiveText({ text, onWordClick, onSentenceClick, darkMode }) {
+  const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text]
   return (
-    <div className={`leading-relaxed text-justify font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} dir="ltr">
-      {text.split(' ').map((word, index) => {
-        const cleanWord = word.replace(/[.,!?]/g, ''); 
-        return (
-          <span key={index}>
+    <div className={`space-y-3 leading-relaxed text-justify font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} dir="ltr">
+      {sentences.map((sentence, sentenceIndex) => (
+        <p key={sentenceIndex} className="group">
+          {sentence.match(/\\s+|[^\\s]+/g)?.map((token, tokenIndex) => {
+            if (/^\\s+$/.test(token)) return <span key={tokenIndex}>{token}</span>
+            const cleanWord = token.replace(/^[^a-zA-Z'-]+|[^a-zA-Z'-]+$/g, '')
+            if (!cleanWord) return <span key={tokenIndex}>{token}</span>
+            return (
+              <button
+                key={tokenIndex}
+                type="button"
+                onClick={() => onWordClick(cleanWord, sentence.trim())}
+                className={`cursor-pointer rounded border-0 bg-transparent p-0 align-baseline transition-colors ${darkMode ? 'hover:bg-indigo-950 hover:text-indigo-300' : 'hover:bg-indigo-100 hover:text-indigo-800'}`}
+                title={`Look up ${cleanWord} in context`}
+                aria-label={`Explain ${cleanWord} in context`}
+              >{token}</button>
+            )
+          })}
+          {onSentenceClick && (
             <button
               type="button"
-              onClick={() => onWordClick(cleanWord)}
-              className={`cursor-pointer transition-colors rounded px-0.5 bg-transparent border-0 p-0 align-baseline ${darkMode ? 'hover:bg-indigo-950 hover:text-indigo-300' : 'hover:bg-indigo-100 hover:text-indigo-800'}`}
-              title="Add to Vocabulary"
-              aria-label={`Save word ${cleanWord}`}
-            >
-              {word}
-            </button>
-            {' '}
-          </span>
-        );
-      })}
+              onClick={() => onSentenceClick(sentence.trim())}
+              className={`ml-2 inline-flex rounded-md px-1.5 py-0.5 align-middle text-xs opacity-70 transition hover:opacity-100 ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-indigo-50'}`}
+              title="Translate this sentence"
+              aria-label="Translate this sentence"
+            >↔</button>
+          )}
+        </p>
+      ))}
     </div>
-  );
+  )
 }
 
 function EmptyState({ message, darkMode }) {
