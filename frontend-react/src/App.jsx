@@ -1105,7 +1105,7 @@ export default function App() {
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <p className="text-xs font-bold uppercase tracking-wide text-indigo-500">{t('reading_meaning_context')}</p>
-                                {readingLookup.data.translation ? <p className="mt-2 text-lg font-extrabold">{readingLookup.data.translation}</p> : null}
+                                {readingLookup.data.translation ? <p className="mt-2 text-lg font-extrabold">{readingLookup.data.translation}</p> : <p className="mt-2 text-sm text-amber-500">{t('reading_word_translation_unavailable')}</p>}
                                 <p className="mt-2 text-sm leading-6" dir="ltr">{readingLookup.data.definition}</p>
                                 {readingLookup.data.part_of_speech ? <p className="mt-1 text-xs opacity-70">{readingLookup.data.part_of_speech}</p> : null}
                               </div>
@@ -1138,7 +1138,7 @@ export default function App() {
                           </section>
                         )}
                         <div className="flex flex-wrap items-center gap-3 border-t border-gray-200/20 pt-4">
-                          {readingLookup.term && <button onClick={saveLookupWord} disabled={readingLookupBusy || readingLookupSaved} className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-60">{readingLookupSaved ? `✓ ${t('reading_saved')}` : readingLookupBusy ? t('reading_saving') : t('reading_save_word')}</button>}
+                          {readingLookup.term && <button onClick={saveLookupWord} disabled={readingLookupBusy || readingLookupSaved || !readingLookup.data?.translation} className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-60">{readingLookupSaved ? `✓ ${t('reading_saved')}` : readingLookupBusy ? t('reading_saving') : t('reading_save_word')}</button>}
                           <button onClick={closeReadingLookup} className={`rounded-xl border px-5 py-3 text-sm font-bold ${darkMode ? 'border-gray-700 hover:bg-gray-800' : 'border-gray-200 hover:bg-gray-50'}`}>{t('close')}</button>
                         </div>
                       </>
