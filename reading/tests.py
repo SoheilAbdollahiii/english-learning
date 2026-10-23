@@ -42,6 +42,25 @@ class ReadingProgressTests(TestCase):
         self.assertFalse(response.data["completed"])
         self.assertEqual(ArticleProgress.objects.filter(user=self.learner).count(), 1)
 
+    def test_invalid_article_ids_return_bad_request(self):
+        for article_id in ("not-an-id", "", 0, -1, True, 1.5):
+            with self.subTest(article_id=article_id):
+                response = self.client.post(
+                    reverse("article_progress"),
+                    {"article_id": article_id, "completed": True},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("article_id", response.data)
+
+    def test_unknown_article_id_returns_not_found(self):
+        response = self.client.post(
+            reverse("article_progress"),
+            {"article_id": 999999, "completed": True},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 404)
+
     def test_progress_requires_authentication(self):
         client = APIClient()
         response = client.get(reverse("article_progress"))
