@@ -43,6 +43,18 @@ jobs:
       - name: Check Django configuration
         run: python manage.py check
 
+      - name: Check production security settings
+        env:
+          SECRET_KEY: ci-only-secret-key-with-more-than-fifty-characters-for-deploy-check
+          DEBUG: "False"
+          ALLOWED_HOSTS: example.com
+          SECURE_SSL_REDIRECT: "True"
+          SESSION_COOKIE_SECURE: "True"
+          CSRF_COOKIE_SECURE: "True"
+          SECURE_HSTS_SECONDS: "31536000"
+          SECURE_HSTS_INCLUDE_SUBDOMAINS: "True"
+        run: python manage.py check --deploy
+
       - name: Check migrations
         run: python manage.py makemigrations --check --dry-run
 
