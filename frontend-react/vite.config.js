@@ -1,8 +1,11 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
+// Local Django API defaults to HTTP. Override for a different local backend if needed.
+// eslint-disable-next-line no-undef
+const djangoTarget = process.env.DJANGO_API_URL || 'http://127.0.0.1:8000'
 const djangoProxy = {
-  target: process.env.DJANGO_API_URL || 'http://127.0.0.1:8000',
+  target: djangoTarget,
   changeOrigin: true,
 }
 
