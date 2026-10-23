@@ -10,6 +10,32 @@ from .models import WritingSubmission
 User = get_user_model()
 
 
+class LegacyWritingServiceTests(TestCase):
+    @patch("writing.services.correct_writing", return_value={
+        "corrected_text": "I went home.",
+        "feedback": "Use past tense.",
+        "score": 90,
+        "grammar_reference": "Past simple",
+    })
+    def test_legacy_service_returns_real_provider_result(self, _correct):
+        from writing.services import analyze_text_with_llm
+
+        result = analyze_text_with_llm("I go home yesterday.")
+
+        self.assertEqual(result[0]["correction"], "I went home.")
+        self.assertEqual(result[0]["reason"], "Use past tense.")
+        self.assertEqual(result[0]["score"], 90)
+        _correct.assert_called_once_with("I go home yesterday.")
+
+    @patch("writing.services.correct_writing", side_effect=RuntimeError("provider unavailable"))
+    def test_legacy_service_does_not_fabricate_feedback_when_provider_fails(self, _correct):
+        from writing.services import analyze_text_with_llm
+
+        with self.assertRaisesMessage(RuntimeError, "provider unavailable"):
+            analyze_text_with_llm("I go home yesterday.")
+
+
+
 class WritingWorkspaceTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="learner", password="Strong-test-pass-123")
