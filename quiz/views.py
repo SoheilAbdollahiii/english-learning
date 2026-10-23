@@ -187,7 +187,9 @@ def build_performance_analysis(details, duration_seconds, previous_sessions):
     topic_stats = {}
     mistake_counts = {}
     for item in details:
-        topic = (item.get("topic") or "").strip()\n        if not topic or topic.lower() == "general":\n            topic = item.get("quiz_type") or "general"
+        topic = (item.get("topic") or "").strip()
+        if not topic or topic.lower() == "general":
+            topic = item.get("quiz_type") or "general"
         stats = topic_stats.setdefault(topic, {"topic": topic, "attempted": 0, "correct": 0})
         stats["attempted"] += 1
         if item.get("is_correct"):
