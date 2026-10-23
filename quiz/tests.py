@@ -35,6 +35,14 @@ class LearningQuizTests(TestCase):
                 self.assertTrue(all(item["level"] == level for item in response.data))
                 self.assertNotIn("correct_option", response.data[0])
 
+    def test_correct_answer_positions_are_not_identical_within_each_bank(self):
+        for quiz_type in ("vocabulary", "reading", "grammar"):
+            for level in ("A1", "B1", "C1"):
+                positions = set(
+                    Question.objects.filter(quiz_type=quiz_type, level=level).values_list("correct_option", flat=True)
+                )
+                self.assertGreaterEqual(len(positions), 2, f"Answer positions are too predictable for {quiz_type}/{level}")
+
     def test_invalid_quiz_type_is_rejected(self):
         response = self.client.get(reverse("quiz_questions"), {"type": "made-up"})
         self.assertEqual(response.status_code, 400)
