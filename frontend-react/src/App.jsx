@@ -62,7 +62,6 @@ export default function App() {
   const [articles, setArticles] = useState([])
   const [writings, setWritings] = useState([])
   const [personalWords, setPersonalWords] = useState([])
-  const [reviewQueue, setReviewQueue] = useState([])
   const [dueReviewCount, setDueReviewCount] = useState(0)
   const [activeReviewWord, setActiveReviewWord] = useState(null)
   const [reviewAnswerVisible, setReviewAnswerVisible] = useState(false)
@@ -228,7 +227,6 @@ export default function App() {
           setReadingProgress(Array.isArray(progressData) ? progressData : [])
           setQuizHistory(Array.isArray(historyData) ? historyData : [])
           if (statsRes.ok) setQuizStats(statsData)
-          setReviewQueue(reviewRes.ok && Array.isArray(reviewData.results) ? reviewData.results : [])
           setDueReviewCount(reviewRes.ok ? Number(reviewData.count) || 0 : 0)
         } else if (activeTab === 'reading') {
           const [articlesRes, progressRes] = await Promise.all([
@@ -437,7 +435,6 @@ export default function App() {
       const res = await apiFetch(apiUrl('/vocabulary/api/review/queue/'))
       const data = await res.json()
       if (res.ok && Array.isArray(data.results)) {
-        setReviewQueue(data.results)
         setDueReviewCount(Number(data.count) || 0)
         return data.results
       }
@@ -473,7 +470,6 @@ export default function App() {
       const queueRes = await apiFetch(apiUrl('/vocabulary/api/review/queue/'))
       const queueData = await queueRes.json()
       const remaining = queueRes.ok && Array.isArray(queueData.results) ? queueData.results : []
-      setReviewQueue(remaining)
       setDueReviewCount(queueRes.ok ? Number(queueData.count) || 0 : remaining.length)
       setActiveReviewWord(remaining[0] || null)
       setReviewAnswerVisible(false)
