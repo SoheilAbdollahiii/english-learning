@@ -25,6 +25,9 @@ class Question(models.Model):
     level = models.CharField(max_length=10, default='B1')
     difficulty = models.CharField(max_length=10, choices=[('easy', 'Easy'), ('medium', 'Medium'), ('hard', 'Hard')], default='medium', db_index=True)
     topic = models.CharField(max_length=80, blank=True, default="general", db_index=True)
+    example_sentence = models.TextField(blank=True, default="")
+    example_translation = models.TextField(blank=True, default="")
+    common_mistake = models.TextField(blank=True, default="")
 
     def __str__(self):
         return f"[{self.quiz_type}] {self.question_text[:50]}"
