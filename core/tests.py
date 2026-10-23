@@ -37,3 +37,52 @@ class CorePageRoutingTests(TestCase):
 
     def test_writing_route_is_registered_at_expected_path(self):
         self.assertEqual(reverse("writing_submit"), "/writing/")
+
+
+class LearnerRegistrationTests(TestCase):
+    def setUp(self):
+        from rest_framework.test import APIClient
+        self.api = APIClient()
+
+    def test_registration_creates_user_and_returns_jwt_tokens(self):
+        response = self.api.post(
+            reverse("register_learner"),
+            {
+                "username": "new-learner",
+                "email": "learner@example.com",
+                "password": "Better-password-Unique-984!x",
+                "password_confirm": "Better-password-Unique-984!x",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertIn("access", response.data)
+        self.assertIn("refresh", response.data)
+        user = User.objects.get(username="new-learner")
+        self.assertTrue(user.check_password("Better-password-Unique-984!x"))
+
+    def test_registration_rejects_mismatched_passwords(self):
+        response = self.api.post(
+            reverse("register_learner"),
+            {
+                "username": "new-learner",
+                "password": "Better-password-Unique-984!x",
+                "password_confirm": "a-different-password",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(User.objects.filter(username="new-learner").exists())
+
+    def test_registration_rejects_duplicate_username_case_insensitively(self):
+        User.objects.create_user(username="ExistingLearner", password="Strong-test-pass-123")
+        response = self.api.post(
+            reverse("register_learner"),
+            {
+                "username": "existinglearner",
+                "password": "Better-password-Unique-984!x",
+                "password_confirm": "Better-password-Unique-984!x",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
