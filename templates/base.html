@@ -54,6 +54,20 @@
         .custom-card:hover { transform: translateY(-4px); box-shadow: 0 14px 30px rgba(31,47,86,.08); }
         .alert { border: 0; border-radius: 14px; }
         .form-control { border-radius: 10px; padding: .75rem .85rem; }
+        body[data-theme="dark"] { --ink:#edf1ff; --muted:#aab4cc; --line:#303b55; --surface:#1c263a; --page:#111827; color:var(--ink); }
+        body[data-theme="dark"] .site-nav { background:rgba(17,24,39,.94); }
+        body[data-theme="dark"] .navbar-brand, body[data-theme="dark"] .submission-preview { color:var(--ink); }
+        body[data-theme="dark"] .navbar .nav-link { color:#c1c9dc; }
+        body[data-theme="dark"] .navbar .nav-link:hover, body[data-theme="dark"] .navbar .nav-link.active { background:#273253; color:#bfc7ff; }
+        body[data-theme="dark"] .notice-panel, body[data-theme="dark"] .empty-state { background:#182236; color:#c0c9dc; border-color:#303b55; }
+        body[data-theme="dark"] .writing-editor, body[data-theme="dark"] .form-control { background:#131d2e; color:var(--ink); border-color:#394660; }
+        body[data-theme="dark"] .text-secondary { color:#aab4cc !important; }
+        body[data-theme="dark"] .custom-card { background:var(--surface); }
+        body[data-theme="dark"] .alert-info { background:#1e3552; color:#d7e6ff; }
+        body[data-theme="dark"] .alert-success { background:#173c31; color:#d4f8e7; }
+        body[data-theme="dark"] .alert-danger { background:#4a242d; color:#ffe0e5; }
+        html[dir="rtl"] body { font-family: Tahoma, Arial, sans-serif; }
+        html[dir="rtl"] .brand-mark { margin-right:0; margin-left:.55rem; }
         @media (max-width: 767px) { .writing-hero { border-radius: 20px !important; } .surface-card { border-radius: 18px; } .stat-panel { padding: 1rem; } }
     </style>
 </head>
@@ -70,6 +84,8 @@
             </ul>
             {% else %}<div class="me-auto"></div>{% endif %}
             <div class="d-flex align-items-center gap-2 py-3 py-lg-0">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="languageToggle" aria-label="Switch language">فارسی</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="themeToggle" aria-label="Toggle dark mode">☾</button>
                 {% if user.is_authenticated %}
                     <span class="small text-secondary me-1">Hi, {{ user.username }}</span>
                     <form method="post" action="{% url 'logout' %}" class="m-0">{% csrf_token %}<button type="submit" class="btn btn-outline-secondary btn-sm">Log out</button></form>
@@ -91,5 +107,171 @@
     {% block content %}{% endblock %}
 </main>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+(function () {
+    const root = document.documentElement;
+    const body = document.body;
+    const themeButton = document.getElementById("themeToggle");
+    const languageButton = document.getElementById("languageToggle");
+    const translations = {
+        "Dashboard": "داشبورد",
+        "Toggle dark mode": "تغییر به حالت تاریک",
+        "Toggle light mode": "تغییر به حالت روشن",
+        "Switch language": "تغییر زبان",
+        "English": "انگلیسی",
+        "Studio": "استودیو",
+        "Welcome back, ": "خوش برگشتید، ",
+        ". Pick up where you left off and keep building your English, one sentence at a time.": ". از همان‌جا ادامه دهید و قدم‌به‌قدم انگلیسی خود را تقویت کنید.",
+        "Writing studio": "تمرین نوشتن",
+        "01 · WRITE": "۰۱ · نوشتن",
+        "02 · VOCABULARY": "۰۲ · واژگان",
+        "03 · READING": "۰۳ · خواندن",
+        "Practice expressing your ideas and keep a private journal of your writing submissions.": "ایده‌های خود را بیان کنید و دفترچه‌ای خصوصی از نوشته‌هایتان داشته باشید.",
+        "Up to ": "حداکثر ",
+        " characters": " نویسه",
+        "Practice #": "تمرین شماره ",
+        "Hi, ": "سلام، ",
+        "Log out": "خروج",
+        "Log in": "ورود",
+        "YOUR WRITING STUDIO": "فضای تمرین نوشتن",
+        "Make space for better English.": "برای انگلیسی بهتر تمرین کنید.",
+        "Write freely, save your practice, and revisit your progress in one calm workspace.": "آزادانه بنویسید، تمرین‌ها را ذخیره کنید و پیشرفتتان را ببینید.",
+        "saved practice": "تمرین ذخیره‌شده",
+        "saved practices": "تمرین‌های ذخیره‌شده",
+        "01 / PRACTICE": "۰۱ / تمرین",
+        "What would you like to say?": "چه می‌خواهید بنویسید؟",
+        "Write a paragraph, a journal entry, or a short story. Your text is saved privately to your account.": "یک پاراگراف، یادداشت روزانه یا داستان کوتاه بنویسید. متن فقط در حساب شما ذخیره می‌شود.",
+        "Your English text": "متن انگلیسی شما",
+        "Yesterday, I went for a walk and...": "دیروز برای پیاده‌روی رفتم و...",
+        "A first draft is always a good start.": "شروع کردن با یک پیش‌نویس ساده کافی است.",
+        "Save my writing": "ذخیره نوشته",
+        "02 / YOUR JOURNAL": "۰۲ / نوشته‌های شما",
+        "Recent practice": "تمرین‌های اخیر",
+        "Your journal starts here": "دفتر نوشته‌های شما از اینجا شروع می‌شود",
+        "Your saved writing will appear here, visible only to you.": "نوشته‌های ذخیره‌شده اینجا نمایش داده می‌شوند و فقط برای شما قابل مشاهده‌اند.",
+        "Analysis status:": "وضعیت تحلیل:",
+        "Feedback:": "بازخورد:",
+        "Please enter a piece of writing before submitting.": "لطفاً پیش از ارسال، متنی بنویسید.",
+        "Your writing must be 5,000 characters or fewer.": "متن شما باید حداکثر ۵۰۰۰ نویسه باشد.",
+        "AI correction is currently unavailable.": "تصحیح هوش مصنوعی فعلاً در دسترس نیست.",
+        "Writing corrected and saved": "نوشته با موفقیت تصحیح و ذخیره شد",
+        "Draft saved as": "پیش‌نویس ذخیره شد",
+        "YOUR ENGLISH, YOUR PACE": "انگلیسی شما، با سرعت شما",
+        "Build confidence.": "اعتمادبه‌نفس بسازید.",
+        "One sentence at a time.": "هر بار یک جمله.",
+        "A welcoming place to practice writing, keep track of your work, and grow your English skills step by step.": "جایی برای تمرین نوشتن، پیگیری کارها و تقویت تدریجی زبان انگلیسی.",
+        "Go to my dashboard": "رفتن به داشبورد",
+        "Start your practice": "شروع تمرین",
+        "A GOOD PLACE TO START": "شروعی خوب",
+        "Write without pressure.": "بدون نگرانی بنویسید.",
+        "Save a short paragraph, reflect on your progress, and come back whenever you're ready to practice again.": "یک پاراگراف کوتاه ذخیره کنید، پیشرفت خود را مرور کنید و هر وقت آماده بودید دوباره تمرین کنید.",
+        "Writing journal": "دفتر نوشتن",
+        "Private history": "تاریخچه خصوصی",
+        "Writing practice": "تمرین نگارش",
+        "Capture your thoughts and keep your writing together.": "ایده‌های خود را بنویسید و همه نوشته‌ها را یکجا نگه دارید.",
+        "Vocabulary": "واژگان",
+        "A shared vocabulary collection is available in the backend; the learning interface is still in development.": "مجموعه‌ای از واژگان در بخش پشتیبانی وجود دارد و رابط یادگیری آن هنوز در حال توسعه است.",
+        "Reading content is being prepared for a dedicated learning experience.": "محتوای خواندن برای تجربه‌ای اختصاصی در حال آماده‌سازی است.",
+        "Vocabulary bank": "بانک واژگان",
+        "Reading": "مطالعه",
+        "Reading practice": "تمرین خواندن",
+        "YOUR LEARNING SPACE": "فضای یادگیری شما",
+        "A little practice goes a long way.": "تمرین کم اما پیوسته نتیجه بزرگی دارد.",
+        "Open writing studio": "باز کردن فضای نوشتن",
+        "Start writing": "شروع نوشتن",
+        "Learning interface not available yet": "رابط یادگیری هنوز آماده نیست",
+        "Learning interface not available yet": "رابط یادگیری هنوز آماده نیست",
+        "WELCOME BACK": "خوش برگشتید",
+        "Your next step starts here.": "قدم بعدی شما از اینجا شروع می‌شود.",
+        "Log in to return to your personal learning space.": "برای بازگشت به فضای یادگیری شخصی خود وارد شوید.",
+        "Username": "نام کاربری",
+        "Password": "رمز عبور",
+        "Your saved writing stays private to your account.": "نوشته‌های ذخیره‌شده فقط در حساب شما قابل مشاهده‌اند.",
+        "AI-corrected version": "نسخه اصلاح‌شده با هوش مصنوعی",
+        "Score": "امتیاز",
+        "Saved · AI correction unavailable": "ذخیره شد · تصحیح هوش مصنوعی در دسترس نیست",
+        "AI correction complete": "تصحیح هوش مصنوعی کامل شد",
+        "Practice": "تمرین",
+        "Your writing was saved": "نوشته شما ذخیره شد",
+        "English text": "متن انگلیسی",
+        "The project contains": "این پروژه شامل",
+        "entries. A dedicated learning and progress interface is still being developed.": "مورد است. رابط اختصاصی یادگیری و پیگیری پیشرفت هنوز در حال توسعه است.",
+        " vocabulary entries. A dedicated learning and progress interface is still being developed.": " واژه در بانک وجود دارد. رابط اختصاصی یادگیری و پیگیری پیشرفت هنوز در حال توسعه است.",
+        "There are": "تعداد",
+        "reading entries in the project. Reading exercises and progress tracking are not available in the interface yet.": "مقاله در پروژه وجود دارد. تمرین‌های خواندن و پیگیری پیشرفت هنوز در رابط کاربری در دسترس نیستند.",
+        " reading entries in the project. Reading exercises and progress tracking are not available in the interface yet.": " مقاله در پروژه وجود دارد. تمرین‌های خواندن و پیگیری پیشرفت هنوز در رابط کاربری در دسترس نیستند."
+    };
+    const originals = new Map(Object.entries(translations).map(([en, fa]) => [fa, en]));
+    let isPersian = false;
+    function translateValue(raw, persian) {
+        const trimmed = raw.trim();
+        const exact = persian ? translations[trimmed] : originals.get(trimmed);
+        if (exact) return raw.replace(trimmed, exact);
+        let translated = raw;
+        const pairs = persian
+            ? Object.entries(translations).sort((a, b) => b[0].length - a[0].length)
+            : Array.from(originals.entries()).sort((a, b) => b[0].length - a[0].length);
+        pairs.forEach(([source, target]) => {
+            if (source && translated.includes(source)) {
+                translated = translated.split(source).join(target);
+            }
+        });
+        return translated;
+    }
+    function translateTextNodes(persian) {
+        const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, {
+            acceptNode(node) {
+                if (node.parentElement && node.parentElement.closest("script, style, noscript")) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+            }
+        });
+        const nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+        nodes.forEach(node => {
+            node.nodeValue = translateValue(node.nodeValue, persian);
+        });
+        body.querySelectorAll("[placeholder], [aria-label], [title]").forEach(element => {
+            ["placeholder", "aria-label", "title"].forEach(attribute => {
+                if (element.hasAttribute(attribute)) {
+                    const value = element.getAttribute(attribute);
+                    element.setAttribute(attribute, translateValue(value, persian));
+                }
+            });
+        });
+    }
+    let savedTheme = null;
+    try { savedTheme = localStorage.getItem("english-studio-theme"); } catch (_) {}
+    body.dataset.theme = savedTheme === "dark" ? "dark" : "light";
+    if (themeButton) themeButton.addEventListener("click", function () {
+        body.dataset.theme = body.dataset.theme === "dark" ? "light" : "dark";
+        try { localStorage.setItem("english-studio-theme", body.dataset.theme); } catch (_) {}
+        themeButton.textContent = body.dataset.theme === "dark" ? "☀" : "☾";
+        const themeLabel = body.dataset.theme === "dark" ? "Toggle light mode" : "Toggle dark mode";
+        themeButton.setAttribute("aria-label", translateValue(themeLabel, isPersian));
+    });
+    if (languageButton) languageButton.addEventListener("click", function () {
+        isPersian = !isPersian;
+        translateTextNodes(isPersian);
+        root.lang = isPersian ? "fa" : "en";
+        root.dir = isPersian ? "rtl" : "ltr";
+        try { localStorage.setItem("english-studio-language", isPersian ? "fa" : "en"); } catch (_) {}
+        languageButton.textContent = isPersian ? "English" : "فارسی";
+    });
+    let savedLanguage = "en";
+    try { savedLanguage = localStorage.getItem("english-studio-language") || "en"; } catch (_) {}
+    isPersian = savedLanguage === "fa";
+    if (isPersian) translateTextNodes(true);
+    root.lang = isPersian ? "fa" : "en";
+    root.dir = isPersian ? "rtl" : "ltr";
+    if (languageButton) languageButton.textContent = isPersian ? "English" : "فارسی";
+    if (themeButton) {
+        themeButton.textContent = body.dataset.theme === "dark" ? "☀" : "☾";
+        const themeLabel = body.dataset.theme === "dark" ? "Toggle light mode" : "Toggle dark mode";
+        themeButton.setAttribute("aria-label", translateValue(themeLabel, isPersian));
+    }
+})();
+</script>
 </body>
 </html>
