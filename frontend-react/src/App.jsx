@@ -42,8 +42,15 @@ export default function App() {
   const [quizType, setQuizType] = useState('vocabulary')
   const [quizLevel, setQuizLevel] = useState('B1')
   const [quizQuestionCount, setQuizQuestionCount] = useState(5)
-  const [quizTimerEnabled, setQuizTimerEnabled] = useState(false)
-  const [quizTimeLeft, setQuizTimeLeft] = useState(90)
+  const [quizDifficulty, setQuizDifficulty] = useState('all')
+  const [quizShuffle, setQuizShuffle] = useState(true)
+  const [quizAnswerMode, setQuizAnswerMode] = useState('end')
+  const [quizTimerMode, setQuizTimerMode] = useState('none')
+  const [quizTotalDuration, setQuizTotalDuration] = useState(300)
+  const [quizPerQuestionDuration, setQuizPerQuestionDuration] = useState(30)
+  const [quizQuestionTimeLeft, setQuizQuestionTimeLeft] = useState(30)
+  const [quizImmediateFeedback, setQuizImmediateFeedback] = useState({})
+  const [quizTimeLeft, setQuizTimeLeft] = useState(300)
   const [quizTimeExpired, setQuizTimeExpired] = useState(false)
   const [quizError, setQuizError] = useState('')
   
@@ -83,17 +90,29 @@ export default function App() {
   }, [darkMode])
 
   useEffect(() => {
-    if (!quizTimerEnabled || !quizQuestions.length || quizSubmitted || quizTimeExpired || quizTimeLeft <= 0) return undefined
+    if (quizTimerMode === 'none' || !quizQuestions.length || quizSubmitted || quizTimeExpired) return undefined
     const timer = window.setTimeout(() => {
-      if (quizTimeLeft <= 1) {
-        setQuizTimeLeft(0)
-        setQuizTimeExpired(true)
+      if (quizTimerMode === 'total') {
+        if (quizTimeLeft <= 1) {
+          setQuizTimeLeft(0)
+          setQuizTimeExpired(true)
+        } else {
+          setQuizTimeLeft((left) => left - 1)
+        }
+      } else if (quizQuestionTimeLeft <= 1) {
+        if (currentQuestionIndex >= quizQuestions.length - 1) {
+          setQuizQuestionTimeLeft(0)
+          setQuizTimeExpired(true)
+        } else {
+          setCurrentQuestionIndex((index) => Math.min(quizQuestions.length - 1, index + 1))
+          setQuizQuestionTimeLeft(quizPerQuestionDuration)
+        }
       } else {
-        setQuizTimeLeft(quizTimeLeft - 1)
+        setQuizQuestionTimeLeft((left) => left - 1)
       }
     }, 1000)
     return () => window.clearTimeout(timer)
-  }, [quizTimerEnabled, quizQuestions.length, quizSubmitted, quizTimeExpired, quizTimeLeft])
+  }, [quizTimerMode, quizQuestions.length, quizSubmitted, quizTimeExpired, quizTimeLeft, quizQuestionTimeLeft, currentQuestionIndex, quizPerQuestionDuration])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -245,7 +264,9 @@ export default function App() {
     const level = quizLevel || preferences.preferred_level || 'B1'
     const count = quizQuestionCount
     setQuizQuestions([])
-    setQuizTimeLeft(90)
+    setQuizTimeLeft(quizTotalDuration)
+    setQuizQuestionTimeLeft(quizPerQuestionDuration)
+    setQuizImmediateFeedback({})
     setQuizTimeExpired(false)
     setQuizError('')
     setLoadingQuiz(true)
@@ -255,7 +276,7 @@ export default function App() {
     setQuizAnswers({})
 
     try {
-      const res = await apiFetch(apiUrl(`/quiz/api/questions/?type=${type}&level=${level}&count=${count}`))
+      const res = await apiFetch(apiUrl(`/quiz/api/questions/?type=${type}&level=${level}&count=${count}&difficulty=${quizDifficulty}&shuffle=${quizShuffle}`))
       const data = await res.json()
       if (res.ok) {
         setQuizQuestions(Array.isArray(data) ? data : [])
@@ -271,9 +292,27 @@ export default function App() {
     }
   }
 
-  const handleAnswerSelect = (questionId, optionKey) => {
+  const handleAnswerSelect = async (questionId, optionKey) => {
+    if (quizAnswerMode === 'each' && quizImmediateFeedback[questionId]) return
     setQuizAnswers((current) => ({ ...current, [questionId]: optionKey }))
     setQuizError('')
+    if (quizAnswerMode === 'each') {
+      try {
+        const response = await apiFetch(apiUrl('/quiz/api/check-answer/'), {
+          method: 'POST',
+          body: JSON.stringify({ question_id: questionId, answer: optionKey }),
+        })
+        const feedback = await response.json()
+        if (!response.ok) {
+          setQuizError(feedback.detail || t('quiz_feedback_failed'))
+          return
+        }
+        setQuizImmediateFeedback((current) => ({ ...current, [questionId]: feedback }))
+      } catch (error) {
+        console.error('Could not check quiz answer:', error)
+        setQuizError(t('quiz_feedback_failed'))
+      }
+    }
   }
 
   const submitQuizFinal = async (finalAnswers = quizAnswers, { allowPartial = false } = {}) => {
@@ -984,9 +1023,9 @@ export default function App() {
                     <div className="flex flex-wrap justify-between items-center gap-3 text-xs font-bold text-gray-400">
                       <span>{t('question_counter', { current: currentQuestionIndex + 1, total: quizQuestions.length })}</span>
                       <span className="rounded-lg bg-indigo-50 dark:bg-indigo-950 px-3 py-1 text-indigo-600 dark:text-indigo-300">{quizQuestions[currentQuestionIndex].level}</span>
-                      {quizTimerEnabled && (
+                      {quizTimerMode !== 'none' && (
                         <span role="timer" aria-live="off" className={`rounded-lg px-3 py-1 tabular-nums ${quizTimeLeft <= 15 || quizTimeExpired ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'}`}>
-                          ⏱ {Math.floor(quizTimeLeft / 60).toString().padStart(2, '0')}:{(quizTimeLeft % 60).toString().padStart(2, '0')}
+                          ⏱ {Math.floor((quizTimerMode === 'total' ? quizTimeLeft : quizQuestionTimeLeft) / 60).toString().padStart(2, '0')}:{((quizTimerMode === 'total' ? quizTimeLeft : quizQuestionTimeLeft) % 60).toString().padStart(2, '0')}
                         </span>
                       )}
                     </div>
@@ -1033,7 +1072,7 @@ export default function App() {
                       <div role="status" className={`rounded-xl border p-4 text-sm ${darkMode ? 'border-amber-800 bg-amber-950/30 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
                         {t('quiz_time_up')}
                         {Object.keys(quizAnswers).length === 0 && (
-                          <button type="button" onClick={() => { setQuizTimerEnabled(false); setQuizTimeExpired(false); setQuizTimeLeft(90); setQuizError('') }} className="mt-3 block font-bold underline">
+                          <button type="button" onClick={() => { setQuizTimerMode('none'); setQuizTimeExpired(false); setQuizTimeLeft(quizTotalDuration); setQuizQuestionTimeLeft(quizPerQuestionDuration); setQuizError('') }} className="mt-3 block font-bold underline">
                             {t('quiz_continue_untimed')}
                           </button>
                         )}
@@ -1050,7 +1089,7 @@ export default function App() {
                       <button
                         type="button"
                         disabled={currentQuestionIndex === 0 || loadingQuiz}
-                        onClick={() => { setCurrentQuestionIndex((index) => Math.max(0, index - 1)); setQuizError('') }}
+                        onClick={() => { setCurrentQuestionIndex((index) => Math.max(0, index - 1)); setQuizQuestionTimeLeft(quizPerQuestionDuration); setQuizError('') }}
                         className={`rounded-xl border px-4 py-2.5 text-sm font-bold disabled:opacity-40 ${darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'}`}
                       >
                         {t('quiz_previous_question')}
@@ -1059,7 +1098,7 @@ export default function App() {
                         <button
                           type="button"
                           disabled={quizTimeExpired || loadingQuiz}
-                          onClick={() => { setCurrentQuestionIndex((index) => Math.min(quizQuestions.length - 1, index + 1)); setQuizError('') }}
+                          onClick={() => { setCurrentQuestionIndex((index) => Math.min(quizQuestions.length - 1, index + 1)); setQuizQuestionTimeLeft(quizPerQuestionDuration); setQuizError('') }}
                           className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
                         >
                           {t('quiz_next_question')}
@@ -1143,7 +1182,7 @@ export default function App() {
                           setQuizAnswers({})
                           setQuizError('')
                           setQuizTimeExpired(false)
-                          setQuizTimeLeft(90)
+                          setQuizTimeLeft(quizTotalDuration)
                         }}
                         className="py-3 px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-colors shadow-sm"
                       >
