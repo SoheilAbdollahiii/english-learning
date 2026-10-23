@@ -2,13 +2,14 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from rag.services import CorrectionUnavailable, correct_writing
 from .models import WritingSubmission
 from .serializers import WritingSubmissionSerializer
+from core.throttles import WritingCorrectionThrottle
 
 
 MAX_CHARACTERS = 5000
@@ -68,6 +69,7 @@ def writing_submit(request):
 
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([WritingCorrectionThrottle])
 def manage_writings(request):
     """JWT-authenticated API scoped to the authenticated user's submissions."""
     if request.method == "GET":
