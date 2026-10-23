@@ -967,6 +967,12 @@ export default function App() {
                     <p className="text-gray-500 text-sm">{t('quiz_intro')}</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
                       <label className="space-y-2 text-sm font-semibold">
+                        <span>{t('quiz_type_setting')}</span>
+                        <select value={quizType} onChange={(event) => setQuizType(event.target.value)} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                          {['vocabulary', 'reading', 'grammar', 'mixed'].map((type) => <option key={type} value={type}>{t(`quiz_${type}`)}</option>)}
+                        </select>
+                      </label>
+                      <label className="space-y-2 text-sm font-semibold">
                         <span>{t('quiz_level_setting')}</span>
                         <select value={quizLevel} onChange={(event) => setQuizLevel(event.target.value)} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
                           <option value="A1">A1 · Beginner</option>
@@ -981,28 +987,51 @@ export default function App() {
                           {[5, 10, 15, 20, 30].map((count) => <option key={count} value={count}>{count}</option>)}
                         </select>
                       </label>
+                      <label className="space-y-2 text-sm font-semibold">
+                        <span>{t('quiz_difficulty_setting')}</span>
+                        <select value={quizDifficulty} onChange={(event) => setQuizDifficulty(event.target.value)} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                          {['all', 'easy', 'medium', 'hard'].map((difficulty) => <option key={difficulty} value={difficulty}>{t(`difficulty_${difficulty}`)}</option>)}
+                        </select>
+                      </label>
+                      <label className="space-y-2 text-sm font-semibold">
+                        <span>{t('quiz_timer_setting')}</span>
+                        <select value={quizTimerMode} onChange={(event) => setQuizTimerMode(event.target.value)} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                          <option value="none">{t('timer_none')}</option>
+                          <option value="total">{t('timer_total')}</option>
+                          <option value="per-question">{t('timer_per_question')}</option>
+                        </select>
+                      </label>
+                      {quizTimerMode === 'total' && (
+                        <label className="space-y-2 text-sm font-semibold">
+                          <span>{t('quiz_total_duration')}</span>
+                          <select value={quizTotalDuration} onChange={(event) => setQuizTotalDuration(Number(event.target.value))} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                            {[300, 600, 900, 1800].map((seconds) => <option key={seconds} value={seconds}>{seconds / 60} {t('minutes')}</option>)}
+                          </select>
+                        </label>
+                      )}
+                      {quizTimerMode === 'per-question' && (
+                        <label className="space-y-2 text-sm font-semibold">
+                          <span>{t('quiz_question_duration')}</span>
+                          <select value={quizPerQuestionDuration} onChange={(event) => setQuizPerQuestionDuration(Number(event.target.value))} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                            {[15, 30, 60].map((seconds) => <option key={seconds} value={seconds}>{seconds} {t('seconds')}</option>)}
+                          </select>
+                        </label>
+                      )}
+                      <label className="space-y-2 text-sm font-semibold">
+                        <span>{t('quiz_answer_mode')}</span>
+                        <select value={quizAnswerMode} onChange={(event) => setQuizAnswerMode(event.target.value)} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                          <option value="end">{t('answers_at_end')}</option>
+                          <option value="each">{t('answers_after_each')}</option>
+                        </select>
+                      </label>
                     </div>
-                    <label className={`inline-flex items-center justify-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold ${darkMode ? 'border-gray-700 bg-gray-900/40 text-gray-200' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>
-                      <input
-                        type="checkbox"
-                        checked={quizTimerEnabled}
-                        onChange={(event) => setQuizTimerEnabled(event.target.checked)}
-                        disabled={loadingQuiz}
-                        className="h-4 w-4 accent-indigo-600"
-                      />
-                      {t('quiz_timed_mode')}
+                    <label className={`inline-flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold ${darkMode ? 'border-gray-700 bg-gray-900/40 text-gray-200' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>
+                      <input type="checkbox" checked={quizShuffle} onChange={(event) => setQuizShuffle(event.target.checked)} disabled={loadingQuiz} className="h-4 w-4 accent-indigo-600" />
+                      {t('quiz_shuffle_setting')}
                     </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {[
-                        ['vocabulary', 'quiz_vocabulary'],
-                        ['reading', 'quiz_reading'],
-                        ['grammar', 'quiz_grammar'],
-                      ].map(([type, label]) => (
-                        <button key={type} onClick={() => startQuiz(type)} disabled={loadingQuiz} className="py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-colors shadow-sm disabled:opacity-50">
-                          {loadingQuiz && quizType === type ? t('loading') : t(label)}
-                        </button>
-                      ))}
-                    </div>
+                    <button type="button" onClick={() => startQuiz(quizType)} disabled={loadingQuiz} className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-colors shadow-sm disabled:opacity-50">
+                      {loadingQuiz ? t('loading') : t('start_quiz')}
+                    </button>
                   </div>
                 )}
 
@@ -1067,6 +1096,14 @@ export default function App() {
                         )
                       })}
                     </div>
+
+                    {quizAnswerMode === 'each' && quizImmediateFeedback[quizQuestions[currentQuestionIndex].id] && (
+                      <div role="status" className={`rounded-xl border p-4 text-sm space-y-2 ${quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].is_correct ? (darkMode ? 'border-green-800 bg-green-950/30 text-green-200' : 'border-green-200 bg-green-50 text-green-800') : (darkMode ? 'border-red-800 bg-red-950/30 text-red-200' : 'border-red-200 bg-red-50 text-red-800')}`}>
+                        <strong>{quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].is_correct ? t('correct') : t('incorrect')}</strong>
+                        {!quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].is_correct && <p>{t('correct_was', { answer: quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].correct_answer })}</p>}
+                        <p>{t('explanation')}: {quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].explanation}</p>
+                      </div>
+                    )}
 
                     {quizTimeExpired && (
                       <div role="status" className={`rounded-xl border p-4 text-sm ${darkMode ? 'border-amber-800 bg-amber-950/30 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
