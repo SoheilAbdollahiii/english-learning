@@ -72,6 +72,9 @@ export default function App() {
   const [quizStats, setQuizStats] = useState({ current_streak: 0, quiz_sessions_total: 0, daily_activity: [] })
   const [preferences, setPreferences] = useState({ preferred_level: 'B1', daily_word_goal: 10, learning_goal: 'general' })
   const [preferencesSaving, setPreferencesSaving] = useState(false)
+  const [deleteAccountPassword, setDeleteAccountPassword] = useState('')
+  const [deleteAccountConfirmation, setDeleteAccountConfirmation] = useState('')
+  const [deletingAccount, setDeletingAccount] = useState(false)
   const [readingQuery, setReadingQuery] = useState('')
   const [readingLevel, setReadingLevel] = useState('all')
   const [vocabQuery, setVocabQuery] = useState('')
@@ -387,6 +390,37 @@ export default function App() {
       alert(t('preferences_failed'))
     } finally {
       setPreferencesSaving(false)
+    }
+  }
+
+  const handleDeleteAccount = async (event) => {
+    event.preventDefault()
+    if (deleteAccountConfirmation !== 'DELETE') {
+      alert(t('delete_confirmation_required'))
+      return
+    }
+    if (!window.confirm(t('delete_account_confirm'))) return
+
+    setDeletingAccount(true)
+    try {
+      const res = await apiFetch(apiUrl('/api/account/'), {
+        method: 'DELETE',
+        body: JSON.stringify({ password: deleteAccountPassword, confirmation: deleteAccountConfirmation })
+      })
+      if (res.status === 204) {
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        alert(t('account_deleted'))
+        window.location.reload()
+        return
+      }
+      const data = await res.json()
+      alert(data.password || data.confirmation || data.detail || t('delete_account_failed'))
+    } catch (err) {
+      console.error('Account deletion failed:', err)
+      alert(t('delete_account_failed'))
+    } finally {
+      setDeletingAccount(false)
     }
   }
 
@@ -721,6 +755,16 @@ export default function App() {
                   </div>
                   <button type="submit" disabled={preferencesSaving} className="rounded-xl bg-indigo-600 px-5 py-3 font-bold text-white disabled:opacity-50">{preferencesSaving ? t('saving') : t('save_preferences')}</button>
                 </form>
+
+                <section className={`p-6 rounded-2xl border ${darkMode ? 'bg-gray-800 border-rose-900' : 'bg-white border-rose-200'}`}>
+                  <h3 className="text-lg font-extrabold text-rose-600">{t('account_danger_zone')}</h3>
+                  <p className={`mt-2 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('account_danger_desc')}</p>
+                  <form onSubmit={handleDeleteAccount} className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <input type="password" required autoComplete="current-password" aria-label={t('current_password')} placeholder={t('current_password')} value={deleteAccountPassword} onChange={(event) => setDeleteAccountPassword(event.target.value)} className={`rounded-xl border p-3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`} />
+                    <input type="text" required aria-label={t('type_delete_to_confirm')} placeholder={t('type_delete_to_confirm')} value={deleteAccountConfirmation} onChange={(event) => setDeleteAccountConfirmation(event.target.value)} className={`rounded-xl border p-3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`} />
+                    <button type="submit" disabled={deletingAccount || !deleteAccountPassword || deleteAccountConfirmation !== 'DELETE'} className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-3 disabled:opacity-50">{deletingAccount ? t('deleting_account') : t('delete_account')}</button>
+                  </form>
+                </section>
 
                 <div className={`p-6 rounded-2xl shadow-sm border h-96 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                   <h3 className={`text-lg font-bold mb-6 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
