@@ -36,7 +36,7 @@ The React login screen supports self-service registration. `POST /api/register/`
 - `GET /reading/api/articles/?q=<search>&level=A1` — search and filter reading content
 - `GET|POST /reading/api/progress/` — read or update per-user article progress
 - `GET|PATCH /learning/api/preferences/` — retrieve or update personal learning settings
-- `GET /quiz/api/questions/?type=vocabulary|reading|grammar` — fetch a quiz (answers are not exposed)
+- `GET /quiz/api/questions/?type=vocabulary|reading|grammar&level=A1|B1|C1` — fetch five questions at a CEFR level (answers are not exposed)
 - `POST /quiz/api/submit/`, `GET /quiz/api/history/`, and `GET /quiz/api/stats/` — submit answers, view recent results, and retrieve per-user streak plus seven-day quiz activity
 - `POST /api/register/` — create a learner account with validated password and receive JWT tokens
 
