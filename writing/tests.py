@@ -25,7 +25,7 @@ class WritingWorkspaceTests(TestCase):
         response = self.client.get(self.workspace_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Make space for better English.")
-        self.assertContains(response, "AI analysis is not connected yet")
+        self.assertContains(response, "Automatic AI correction is not connected yet")
 
     def test_submission_is_saved_to_current_user_and_redirects(self):
         self.client.force_login(self.user)
