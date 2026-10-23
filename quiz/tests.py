@@ -455,3 +455,62 @@ class DailyChallengeGamificationTests(TestCase):
         self.assertEqual(profile.current_streak, 4)
         self.assertEqual(profile.longest_streak, 4)
         self.assertEqual(profile.total_xp, 50 + result.data["xp_awarded"])
+
+
+class QuizPerformanceAnalysisTests(TestCase):
+    def setUp(self):
+        self.learner = get_user_model().objects.create_user(username="analysis-learner", password="Strong-test-pass-123")
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.learner)
+        self.question = Question.objects.filter(quiz_type="grammar", level="A1").first()
+
+    def submit_one_question(self, answer, duration=75):
+        return self.client.post(
+            reverse("quiz_submit"),
+            {
+                "quiz_type": "grammar",
+                "level": "A1",
+                "duration_seconds": duration,
+                "answers": {str(self.question.id): answer},
+            },
+            format="json",
+        )
+
+    def test_quiz_submission_includes_actionable_analysis_and_persists_it(self):
+        response = self.submit_one_question(self.question.correct_option, duration=92)
+        self.assertEqual(response.status_code, 201)
+        analysis = response.data["analysis"]
+        self.assertEqual(analysis["duration_seconds"], 92)
+        self.assertEqual(analysis["accuracy"], 100)
+        self.assertTrue(analysis["topic_breakdown"])
+        self.assertTrue(analysis["strengths"])
+        self.assertIn("recommended_next_practice", analysis)
+        session = QuizSession.objects.get(id=response.data["session_id"])
+        self.assertEqual(session.duration_seconds, 92)
+        self.assertTrue(session.topic_breakdown)
+        self.assertEqual(session.score, 1)
+
+    def test_analysis_compares_with_previous_quiz_and_can_be_fetched_by_owner(self):
+        first = self.submit_one_question("A" if self.question.correct_option != "A" else "B", duration=45)
+        self.assertEqual(first.status_code, 201)
+        second = self.submit_one_question(self.question.correct_option, duration=30)
+        self.assertEqual(second.status_code, 201)
+        comparison = second.data["analysis"]["comparison"]
+        self.assertEqual(comparison["previous_quiz_accuracy"], 0)
+        self.assertEqual(comparison["change_from_previous_percentage_points"], 100)
+        detail = self.client.get(reverse("quiz_performance_analysis_detail", args=[second.data["session_id"]]))
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.data["duration_seconds"], 30)
+        self.assertEqual(detail.data["analysis"]["comparison"]["previous_quiz_accuracy"], 0)
+
+    def test_analysis_endpoint_does_not_expose_another_users_session(self):
+        response = self.submit_one_question(self.question.correct_option)
+        other_user = get_user_model().objects.create_user(username="other-analysis-user", password="Strong-test-pass-123")
+        self.client.force_authenticate(user=other_user)
+        detail = self.client.get(reverse("quiz_performance_analysis_detail", args=[response.data["session_id"]]))
+        self.assertEqual(detail.status_code, 404)
+
+    def test_invalid_duration_is_rejected(self):
+        response = self.submit_one_question(self.question.correct_option, duration=-1)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("duration_seconds", response.data)
