@@ -31,6 +31,7 @@ An English-learning application with a Django REST API, a React learning interfa
 - `GET|PATCH /learning/api/preferences/` — retrieve or update personal learning settings
 - `GET /quiz/api/questions/?type=vocabulary|reading|grammar` — fetch a quiz (answers are not exposed)
 - `POST /quiz/api/submit/` and `GET /quiz/api/history/` — submit answers and view the current user's recent results
+- `POST /api/register/` — create a learner account with validated password and receive JWT tokens
 
 Run `python manage.py migrate` after pulling the changes so the personal data tables and starter quiz questions are created. The new endpoints require the same JWT login used by the React client.
 
@@ -94,7 +95,7 @@ GitHub Actions checks Django configuration, migration consistency, backend tests
 
 The React app does not assume that the Django API runs on the same machine as the learner's browser.
 
-- For local development, the frontend defaults to `http://127.0.0.1:8000`.
+- For local development, the frontend defaults to `http://127.0.0.1:8000`; Django-rendered landing/dashboard links use `FRONTEND_URL` (default `http://127.0.0.1:5173`).
 - For a same-origin deployment (frontend and API served behind the same domain), leave `VITE_API_BASE_URL` unset in the production build.
 - For a separate API origin, set `VITE_API_BASE_URL` to the public API origin before building the frontend, for example `https://api.example.com` (replace this example with your actual API URL).
 - Add the frontend's public origin to Django's `CORS_ALLOWED_ORIGINS`, and configure `ALLOWED_HOSTS` for the API host. Do not use wildcard origins for authenticated production traffic.
