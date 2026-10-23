@@ -69,6 +69,57 @@ class LearningQuizTests(TestCase):
         self.assertGreater(len(response.data), 5)
         self.assertTrue({item["level"] for item in response.data}.issubset({"A1", "B1", "C1"}))
 
+    def test_mixed_quiz_and_difficulty_filters_work(self):
+        response = self.client.get(reverse("quiz_questions"), {
+            "type": "mixed", "level": "all", "difficulty": "easy", "count": 30,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data)
+        self.assertTrue(all(item["difficulty"] == "easy" for item in response.data))
+        self.assertTrue({item["quiz_type"] for item in response.data}.issubset({"vocabulary", "reading", "grammar"}))
+
+        invalid = self.client.get(reverse("quiz_questions"), {"type": "grammar", "difficulty": "expert"})
+        self.assertEqual(invalid.status_code, 400)
+
+    def test_shuffle_can_be_disabled_for_stable_question_order(self):
+        response = self.client.get(reverse("quiz_questions"), {
+            "type": "grammar", "level": "A1", "count": 5, "shuffle": "false",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([item["id"] for item in response.data], sorted(item["id"] for item in response.data))
+
+    def test_instant_answer_check_returns_feedback_for_one_answer_only(self):
+        question = Question.objects.filter(quiz_type="grammar", level="A1").first()
+        response = self.client.post(
+            reverse("quiz_check_answer"),
+            {"question_id": question.id, "answer": question.correct_option},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["is_correct"])
+        self.assertEqual(response.data["correct_answer"], question.correct_option)
+        self.assertNotIn("correct_option", response.data)
+
+    def test_mixed_quiz_submission_accepts_questions_from_multiple_types_and_levels(self):
+        vocabulary = Question.objects.filter(quiz_type="vocabulary", level="A1").first()
+        grammar = Question.objects.filter(quiz_type="grammar", level="B1").first()
+        response = self.client.post(
+            reverse("quiz_submit"),
+            {
+                "quiz_type": "mixed",
+                "level": "all",
+                "answers": {
+                    str(vocabulary.id): vocabulary.correct_option,
+                    str(grammar.id): grammar.correct_option,
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["total"], 2)
+        self.assertEqual({item["quiz_type"] for item in response.data["details"]}, {"vocabulary", "grammar"})
+        self.assertEqual(QuizSession.objects.get(user=self.learner).quiz_type, "mixed")
+
     def test_invalid_cefr_level_is_rejected(self):
         response = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "A2"})
         self.assertEqual(response.status_code, 400)
