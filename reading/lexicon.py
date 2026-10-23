@@ -103,6 +103,10 @@ def _dictionary_entry(term):
     except (requests.RequestException, ValueError, TypeError, IndexError):
         entry = None
     if entry:
+        # The dictionary API supplies English definitions, not Persian meanings.
+        # Translate the headword separately so non-curated vocabulary is useful too.
+        if not entry.get("translation"):
+            entry["translation"] = _translate_to_persian(normalized)
         cache.set(cache_key, entry, 60 * 60 * 24)
         return entry
     return {
@@ -115,7 +119,10 @@ def _dictionary_entry(term):
 
 
 def _translate_to_persian(text):
-    cache_key = "reading_translation_v1:" + text
+    text = " ".join(text.split()).strip()
+    if not text:
+        return ""
+    cache_key = "reading_translation_v2:" + text
     cached = cache.get(cache_key)
     if cached:
         return cached
@@ -123,15 +130,22 @@ def _translate_to_persian(text):
         response = requests.get(
             "https://translate.googleapis.com/translate_a/single",
             params={"client": "gtx", "sl": "en", "tl": "fa", "dt": "t", "q": text},
+            headers={"User-Agent": "Mozilla/5.0 EnglishLearningStudio/1.0"},
             timeout=3.5,
         )
         if response.ok:
             payload = response.json()
-            translated = "".join(part[0] for part in payload[0] if part and part[0])
-            if translated:
+            segments = payload[0] if isinstance(payload, list) and payload else []
+            translated = "".join(
+                part[0]
+                for part in segments
+                if isinstance(part, list) and part and isinstance(part[0], str)
+            )
+            if translated.strip():
+                translated = translated.strip()
                 cache.set(cache_key, translated, 60 * 60 * 12)
                 return translated
-    except (requests.RequestException, ValueError, TypeError, IndexError):
+    except (requests.RequestException, ValueError, TypeError, IndexError, KeyError):
         pass
     return ""
 
