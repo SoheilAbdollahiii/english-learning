@@ -1316,15 +1316,28 @@ export default function App() {
 
             {activeTab === 'vocabulary' && (
               <div className="space-y-5">
-                <section className={`p-5 rounded-2xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-extrabold">{t('spaced_review')}</h3>
-                      <p className={`text-sm mt-1 max-w-2xl ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('spaced_review_desc')}</p>
+                <section className={`relative overflow-hidden p-5 md:p-7 rounded-3xl border ${darkMode ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-indigo-950 border-indigo-900' : 'bg-gradient-to-br from-white via-indigo-50 to-violet-100 border-indigo-100'}`}>
+                  <div className="absolute -top-10 -right-8 h-36 w-36 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
+                  <div className="relative flex flex-wrap items-start justify-between gap-4">
+                    <div className="max-w-2xl">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-500/10 px-3 py-1 text-xs font-extrabold tracking-wide text-indigo-500 mb-3">
+                        <span aria-hidden="true">✦</span> {t('flashcards_badge')}
+                      </div>
+                      <h3 className="text-xl md:text-2xl font-black">{t('flashcards_title')}</h3>
+                      <p className={`text-sm mt-2 leading-6 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('spaced_review_desc')}</p>
                     </div>
-                    <span className="text-sm font-bold rounded-full px-3 py-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                      {t('due_count', { count: dueReviewCount })}
-                    </span>
+                    <div className={`min-w-28 rounded-2xl border p-4 text-center ${darkMode ? 'border-indigo-800 bg-gray-900/70' : 'border-indigo-200 bg-white/80'}`}>
+                      <div className="text-3xl font-black text-indigo-500 tabular-nums">{dueReviewCount}</div>
+                      <div className={`mt-1 text-xs font-bold ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('due_today')}</div>
+                    </div>
+                  </div>
+                  <div className="relative mt-5 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {[t('flashcard_step_reveal'), t('flashcard_step_rate'), t('flashcard_step_repeat')].map((step, index) => (
+                      <div key={step} className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${darkMode ? 'bg-gray-900/60 text-gray-200' : 'bg-white/70 text-gray-700'}`}>
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/15 text-xs font-black text-indigo-500">{index + 1}</span>
+                        {step}
+                      </div>
+                    ))}
                   </div>
                   {activeReviewWord ? (
                     <div className={`mt-4 p-4 rounded-xl border ${darkMode ? 'border-gray-700 bg-gray-900/40' : 'border-gray-200 bg-gray-50'}`}>
@@ -1349,8 +1362,8 @@ export default function App() {
                   ) : (
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                       <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{dueReviewCount > 0 ? t('due_words_ready') : t('review_complete')}</p>
-                      <button type="button" disabled={reviewBusy} onClick={beginDailyReview} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 disabled:opacity-50">
-                        {dueReviewCount > 0 ? t('start_review') : t('refresh_review_queue')}
+                      <button type="button" disabled={reviewBusy} onClick={beginDailyReview} className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-5 py-3 shadow-lg shadow-indigo-600/20 transition-transform hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0">
+                        <span aria-hidden="true">▶</span> {dueReviewCount > 0 ? t('start_flashcards') : t('refresh_review_queue')}
                       </button>
                     </div>
                   )}
