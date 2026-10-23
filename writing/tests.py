@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
+from unittest.mock import patch
 from django.urls import reverse
 from rest_framework.test import APIClient
 
@@ -25,7 +26,7 @@ class WritingWorkspaceTests(TestCase):
         response = self.client.get(self.workspace_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Make space for better English.")
-        self.assertContains(response, "Automatic AI correction is not connected yet")
+        self.assertContains(response, "When GROQ_API_KEY is configured")
 
     def test_submission_is_saved_to_current_user_and_redirects(self):
         self.client.force_login(self.user)
@@ -37,6 +38,25 @@ class WritingWorkspaceTests(TestCase):
         self.assertEqual(submission.score, 0)
         self.assertEqual(submission.corrected_text, "")
         self.assertContains(self.client.get(self.workspace_url), "I enjoy learning English.")
+
+    @patch("writing.views.correct_writing", return_value={
+        "corrected_text": "I went to school yesterday.",
+        "feedback": "Use past simple for a completed past action.",
+        "score": 92,
+        "grammar_reference": "Past simple rule",
+    })
+    @override_settings(GROQ_API_KEY="test-key")
+    def test_submission_saves_real_correction_feedback_and_score(self, _correct):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            self.workspace_url,
+            {"original_text": "I go to school yesterday."},
+        )
+        self.assertRedirects(response, self.workspace_url)
+        submission = WritingSubmission.objects.get()
+        self.assertEqual(submission.corrected_text, "I went to school yesterday.")
+        self.assertEqual(submission.feedback, "Use past simple for a completed past action.")
+        self.assertEqual(submission.score, 92)
 
     def test_blank_submission_is_not_saved(self):
         self.client.force_login(self.user)
