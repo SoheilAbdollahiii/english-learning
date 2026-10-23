@@ -14,6 +14,8 @@ from .serializers import QuestionSerializer
 
 QUIZ_TYPES = {"vocabulary", "reading", "grammar"}
 QUIZ_LEVELS = {"A1", "B1", "C1"}
+QUIZ_LEVEL_FILTERS = QUIZ_LEVELS | {"all"}
+MAX_QUIZ_QUESTIONS = 30
 
 
 @api_view(["GET"])
@@ -24,17 +26,27 @@ def get_quiz_questions(request):
         return Response({"detail": "Choose vocabulary, reading, or grammar."}, status=status.HTTP_400_BAD_REQUEST)
 
     level = request.query_params.get("level", "B1").strip().upper()
-    if level not in QUIZ_LEVELS:
-        return Response({"detail": "Choose level A1, B1, or C1."}, status=status.HTTP_400_BAD_REQUEST)
+    if level not in QUIZ_LEVEL_FILTERS:
+        return Response({"detail": "Choose level A1, B1, C1, or all."}, status=status.HTTP_400_BAD_REQUEST)
 
-    questions = list(Question.objects.filter(quiz_type=quiz_type, level=level).order_by("id"))
+    try:
+        count = int(request.query_params.get("count", 5))
+    except (TypeError, ValueError):
+        return Response({"detail": "Question count must be an integer between 1 and 30."}, status=status.HTTP_400_BAD_REQUEST)
+    if not 1 <= count <= MAX_QUIZ_QUESTIONS:
+        return Response({"detail": "Question count must be between 1 and 30."}, status=status.HTTP_400_BAD_REQUEST)
+
+    question_query = Question.objects.filter(quiz_type=quiz_type)
+    if level != "all":
+        question_query = question_query.filter(level=level)
+    questions = list(question_query.order_by("id"))
     if not questions:
         return Response(
             {"detail": f"No questions are available for {quiz_type} at level {level} yet."},
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    selected = random.sample(questions, min(len(questions), 5))
+    selected = random.sample(questions, min(len(questions), count))
     return Response(QuestionSerializer(selected, many=True).data)
 
 
@@ -50,8 +62,8 @@ def submit_quiz(request):
         return Response({"detail": "Choose level A1, B1, or C1."}, status=status.HTTP_400_BAD_REQUEST)
     if not isinstance(answers, dict) or not answers:
         return Response({"answers": "Submit at least one answer."}, status=status.HTTP_400_BAD_REQUEST)
-    if len(answers) > 5:
-        return Response({"answers": "Submit no more than five answers per quiz."}, status=status.HTTP_400_BAD_REQUEST)
+    if len(answers) > MAX_QUIZ_QUESTIONS:
+        return Response({"answers": "Submit no more than 30 answers per quiz."}, status=status.HTTP_400_BAD_REQUEST)
 
     normalized_answers = {}
     for raw_question_id, answer in answers.items():
@@ -66,10 +78,10 @@ def submit_quiz(request):
         normalized_answers[question_id] = answer
 
     question_ids = list(normalized_answers)
-    questions = {
-        question.id: question
-        for question in Question.objects.filter(id__in=question_ids, quiz_type=quiz_type, level=level)
-    }
+    question_query = Question.objects.filter(id__in=question_ids, quiz_type=quiz_type)
+    if level != "all":
+        question_query = question_query.filter(level=level)
+    questions = {question.id: question for question in question_query}
     if len(questions) != len(question_ids):
         return Response(
             {"answers": "All submitted questions must belong to the selected quiz type and level."},
