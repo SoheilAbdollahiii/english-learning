@@ -23,7 +23,7 @@ class LearningQuizTests(TestCase):
         for quiz_type in ("vocabulary", "reading", "grammar"):
             response = self.client.get(reverse("quiz_questions"), {"type": quiz_type})
             self.assertEqual(response.status_code, 200)
-            self.assertGreaterEqual(len(response.data), 1)
+            self.assertGreaterEqual(len(response.data), 5)
             self.assertNotIn("correct_option", response.data[0])
 
     def test_each_quiz_type_has_five_questions_at_every_supported_level(self):
@@ -32,6 +32,7 @@ class LearningQuizTests(TestCase):
                 response = self.client.get(reverse("quiz_questions"), {"type": quiz_type, "level": level})
                 self.assertEqual(response.status_code, 200, f"Missing {quiz_type} content at {level}")
                 self.assertEqual(len(response.data), 5)
+                self.assertGreaterEqual(Question.objects.filter(quiz_type=quiz_type, level=level).count(), 8, f"Expanded question bank is missing items for {quiz_type}/{level}")
                 self.assertTrue(all(item["level"] == level for item in response.data))
                 self.assertNotIn("correct_option", response.data[0])
 
