@@ -92,8 +92,7 @@ def practice_word(request, word_id):
         word = UserWord.objects.get(id=word_id, user=request.user)
     except UserWord.DoesNotExist:
         return Response({"detail": "Saved word not found."}, status=status.HTTP_404_NOT_FOUND)
-    word.proficiency = min(100, word.proficiency + 20)
-    word.save(update_fields=["proficiency", "updated_at"])
+    _record_review(word, True)
     return Response(UserWordSerializer(word).data)
 
 
