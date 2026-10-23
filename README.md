@@ -107,6 +107,9 @@ The React app does not assume that the Django API runs on the same machine as th
 - For a separate API origin, set `VITE_API_BASE_URL` to the public API origin before building the frontend, for example `https://api.example.com` (replace this example with your actual API URL).
 - Add the frontend's public origin to Django's `CORS_ALLOWED_ORIGINS`, and configure `ALLOWED_HOSTS` for the API host. Do not use wildcard origins for authenticated production traffic.
 - Keep `SECRET_KEY` and `GROQ_API_KEY` on the server only. Never put either secret in a `VITE_*` variable or commit a real `.env` file.
+- Set `DATABASE_URL` to a managed PostgreSQL connection string for production; SQLite remains the default for local development. PostgreSQL connections require SSL by default when `DEBUG=False`; set `DATABASE_SSL_REQUIRE=False` only for a trusted local database that does not support SSL.
+- Set `REDIS_URL` to a shared Redis instance in production so registration, login, and writing throttles are consistent across workers. Without it, Django uses its local in-process cache and limits are not shared between app instances.
+- Before serving real users over HTTPS, set `SECURE_SSL_REDIRECT=True`, `SESSION_COOKIE_SECURE=True`, `CSRF_COOKIE_SECURE=True`, and `SECURE_HSTS_SECONDS=31536000`. Enable HSTS subdomains/preload only when every relevant subdomain is HTTPS-ready.
 
 ### Product-readiness notes
 
