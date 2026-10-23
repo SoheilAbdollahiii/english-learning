@@ -9,4 +9,7 @@ urlpatterns = [
     path("api/check-answer/", views.check_quiz_answer, name="quiz_check_answer"),
     path("api/history/", views.quiz_history, name="quiz_history"),
     path("api/stats/", views.quiz_stats, name="quiz_stats"),
+    path("api/daily-challenge/", views.daily_challenge, name="daily_challenge"),
+    path("api/daily-challenge/submit/", views.submit_daily_challenge, name="submit_daily_challenge"),
+    path("api/gamification/", views.gamification_status, name="gamification_status"),
 ]
