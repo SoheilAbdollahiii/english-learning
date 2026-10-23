@@ -8,7 +8,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Question, QuizSession
+from .models import AdaptiveQuizProgress, Question, QuizSession
 from .serializers import QuestionSerializer
 
 
@@ -86,13 +86,55 @@ def check_quiz_answer(request):
     if question is None:
         return Response({"detail": "Question not found."}, status=status.HTTP_404_NOT_FOUND)
     is_correct = question.correct_option.upper() == answer
-    return Response({
+    payload = {
         "question_id": question.id,
         "user_answer": answer,
         "correct_answer": question.correct_option.upper(),
         "is_correct": is_correct,
         "explanation": question.explanation or "No explanation provided for this question.",
-    })
+    }
+
+    if str(request.data.get("adaptive", "")).lower() in {"1", "true", "yes", "on"}:
+        # Adaptive progress is independent for Grammar, Vocabulary, and Reading.
+        progress, _ = AdaptiveQuizProgress.objects.get_or_create(
+            user=request.user, skill=question.quiz_type
+        )
+        progress.total_attempts += 1
+        if is_correct:
+            progress.total_correct += 1
+            progress.correct_streak += 1
+            progress.wrong_streak = 0
+            if progress.correct_streak >= 3:
+                index = ADAPTIVE_DIFFICULTY_ORDER.index(progress.current_difficulty)
+                progress.current_difficulty = ADAPTIVE_DIFFICULTY_ORDER[min(index + 1, 2)]
+                progress.correct_streak = 0
+            if progress.focus_topic == question.topic and progress.focus_topic:
+                topic_mistakes = dict(progress.topic_mistakes)
+                topic_mistakes[question.topic] = max(0, topic_mistakes.get(question.topic, 0) - 1)
+                if topic_mistakes[question.topic] == 0:
+                    progress.focus_topic = ""
+                    topic_mistakes.pop(question.topic, None)
+                progress.topic_mistakes = topic_mistakes
+        else:
+            progress.wrong_streak += 1
+            progress.correct_streak = 0
+            progress.focus_topic = question.topic or question.quiz_type
+            topic_mistakes = dict(progress.topic_mistakes)
+            topic_mistakes[progress.focus_topic] = topic_mistakes.get(progress.focus_topic, 0) + 1
+            progress.topic_mistakes = topic_mistakes
+            if progress.wrong_streak >= 2:
+                index = ADAPTIVE_DIFFICULTY_ORDER.index(progress.current_difficulty)
+                progress.current_difficulty = ADAPTIVE_DIFFICULTY_ORDER[max(index - 1, 0)]
+                progress.wrong_streak = 0
+        progress.save()
+        payload["adaptive_progress"] = _adaptive_progress_payload(progress)
+        payload["recommended_next_difficulty"] = (
+            "easy" if progress.focus_topic and progress.topic_mistakes.get(progress.focus_topic, 0) > 0
+            else progress.current_difficulty
+        )
+        payload["recommended_topic"] = progress.focus_topic or ""
+
+    return Response(payload)
 
 
 @api_view(["POST"])
@@ -229,3 +271,90 @@ def quiz_stats(request):
             {"date": day, "count": count} for day, count in counts.items()
         ],
     })
+
+
+ADAPTIVE_DIFFICULTY_ORDER = ("easy", "medium", "hard")
+
+
+def _adaptive_progress_payload(progress):
+    return {
+        "skill": progress.skill,
+        "current_difficulty": progress.current_difficulty,
+        "correct_streak": progress.correct_streak,
+        "wrong_streak": progress.wrong_streak,
+        "total_attempts": progress.total_attempts,
+        "accuracy": progress.accuracy,
+        "focus_topic": progress.focus_topic,
+    }
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_adaptive_quiz_question(request):
+    """Select one question using only this learner's progress for the chosen skill."""
+    skill = request.query_params.get("skill", "vocabulary").strip().lower()
+    if skill not in QUIZ_TYPES:
+        return Response({"detail": "Adaptive skill must be vocabulary, reading, or grammar."}, status=status.HTTP_400_BAD_REQUEST)
+
+    level = normalize_level(request.query_params.get("level", "B1"))
+    if level not in QUIZ_LEVEL_FILTERS:
+        return Response({"detail": "Choose level A1, A2, B1, B2, C1, C2, or all."}, status=status.HTTP_400_BAD_REQUEST)
+
+    progress, _ = AdaptiveQuizProgress.objects.get_or_create(user=request.user, skill=skill)
+    query = Question.objects.filter(quiz_type=skill)
+    if level != "all":
+        query = query.filter(level=level)
+
+    focus_topic = progress.focus_topic
+    needs_topic_practice = bool(focus_topic and progress.topic_mistakes.get(focus_topic, 0) > 0)
+    preferred_difficulty = "easy" if needs_topic_practice else progress.current_difficulty
+    candidate_query = query.filter(difficulty=preferred_difficulty)
+    if needs_topic_practice:
+        topic_query = candidate_query.filter(topic=focus_topic)
+        if topic_query.exists():
+            candidate_query = topic_query
+        else:
+            # Old/custom question banks may not have topic metadata yet. Keep practice
+            # in the same skill and at an easier level rather than returning no question.
+            candidate_query = query.filter(difficulty="easy")
+
+    recent_ids = progress.recent_question_ids if isinstance(progress.recent_question_ids, list) else []
+    fresh_query = candidate_query.exclude(id__in=recent_ids)
+    if fresh_query.exists():
+        candidate_query = fresh_query
+    if not candidate_query.exists():
+        # Small banks should still work after every question has been seen.
+        candidate_query = query.filter(difficulty=preferred_difficulty)
+        if needs_topic_practice:
+            topic_query = candidate_query.filter(topic=focus_topic)
+            if topic_query.exists():
+                candidate_query = topic_query
+    if not candidate_query.exists():
+        available = list(query.values_list("difficulty", flat=True).distinct())
+        if not available:
+            return Response({"detail": f"No questions are available for {skill} at level {level}."}, status=status.HTTP_404_NOT_FOUND)
+        preferred_index = ADAPTIVE_DIFFICULTY_ORDER.index(preferred_difficulty)
+        chosen_difficulty = min(
+            available,
+            key=lambda value: abs(ADAPTIVE_DIFFICULTY_ORDER.index(value) - preferred_index)
+            if value in ADAPTIVE_DIFFICULTY_ORDER else 99,
+        )
+        candidate_query = query.filter(difficulty=chosen_difficulty)
+
+    question = random.choice(list(candidate_query))
+    progress.recent_question_ids = (recent_ids + [question.id])[-20:]
+    progress.save(update_fields=["recent_question_ids", "updated_at"])
+    return Response({
+        "question": QuestionSerializer(question).data,
+        "progress": _adaptive_progress_payload(progress),
+        "is_topic_practice": needs_topic_practice,
+        "requested_difficulty": preferred_difficulty,
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def adaptive_quiz_progress(request):
+    """Expose per-skill adaptive progress without leaking other learners' data."""
+    progress = AdaptiveQuizProgress.objects.filter(user=request.user).order_by("skill")
+    return Response([_adaptive_progress_payload(item) for item in progress])

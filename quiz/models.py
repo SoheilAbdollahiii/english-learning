@@ -27,3 +27,34 @@ class Question(models.Model):
 
     def __str__(self):
         return f"[{self.quiz_type}] {self.question_text[:50]}"
+
+class AdaptiveQuizProgress(models.Model):
+    """Independent adaptive state for each learner and quiz skill."""
+    DIFFICULTY_CHOICES = Question._meta.get_field("difficulty").choices
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="adaptive_quiz_progress")
+    skill = models.CharField(max_length=20, choices=[
+        ("vocabulary", "Vocabulary"), ("grammar", "Grammar"), ("reading", "Reading")
+    ])
+    current_difficulty = models.CharField(max_length=10, choices=DIFFICULTY_CHOICES, default="medium")
+    correct_streak = models.PositiveSmallIntegerField(default=0)
+    wrong_streak = models.PositiveSmallIntegerField(default=0)
+    total_attempts = models.PositiveIntegerField(default=0)
+    total_correct = models.PositiveIntegerField(default=0)
+    focus_topic = models.CharField(max_length=80, blank=True, default="")
+    topic_mistakes = models.JSONField(default=dict, blank=True)
+    recent_question_ids = models.JSONField(default=list, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("user", "skill"), name="unique_adaptive_progress_per_skill")
+        ]
+
+    @property
+    def accuracy(self):
+        if not self.total_attempts:
+            return 0
+        return round(self.total_correct * 100 / self.total_attempts)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.skill} - {self.current_difficulty}"

@@ -261,3 +261,64 @@ class LearningQuizTests(TestCase):
         self.assertEqual(response.data["current_streak"], 2)
         self.assertEqual(response.data["quiz_sessions_total"], 2)
         self.assertEqual(response.data["daily_activity"][-1]["count"], 1)
+
+
+    def test_adaptive_progress_is_separate_for_grammar_and_vocabulary(self):
+        grammar = Question.objects.filter(quiz_type="grammar", level="A1").first()
+        vocab = Question.objects.filter(quiz_type="vocabulary", level="A1").first()
+        for question in (grammar, vocab):
+            response = self.client.post(
+                reverse("quiz_check_answer"),
+                {"question_id": question.id, "answer": question.correct_option, "adaptive": True},
+                format="json",
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("adaptive_progress", response.data)
+        from .models import AdaptiveQuizProgress
+        self.assertEqual(AdaptiveQuizProgress.objects.get(user=self.learner, skill="grammar").total_attempts, 1)
+        self.assertEqual(AdaptiveQuizProgress.objects.get(user=self.learner, skill="vocabulary").total_attempts, 1)
+
+    def test_two_wrong_adaptive_answers_reduce_difficulty_and_focus_topic(self):
+        from .models import AdaptiveQuizProgress
+        question = Question.objects.filter(quiz_type="grammar", level="A1").first()
+        wrong_answer = next(option for option in ("A", "B", "C", "D") if option != question.correct_option)
+        for _ in range(2):
+            response = self.client.post(
+                reverse("quiz_check_answer"),
+                {"question_id": question.id, "answer": wrong_answer, "adaptive": True},
+                format="json",
+            )
+            self.assertEqual(response.status_code, 200)
+        progress = AdaptiveQuizProgress.objects.get(user=self.learner, skill="grammar")
+        self.assertEqual(progress.current_difficulty, "easy")
+        self.assertEqual(progress.focus_topic, question.topic)
+        self.assertEqual(progress.topic_mistakes[question.topic], 2)
+
+    def test_three_correct_adaptive_answers_increase_difficulty(self):
+        from .models import AdaptiveQuizProgress
+        question = Question.objects.filter(quiz_type="vocabulary", level="A1").first()
+        for _ in range(3):
+            response = self.client.post(
+                reverse("quiz_check_answer"),
+                {"question_id": question.id, "answer": question.correct_option, "adaptive": True},
+                format="json",
+            )
+            self.assertEqual(response.status_code, 200)
+        progress = AdaptiveQuizProgress.objects.get(user=self.learner, skill="vocabulary")
+        self.assertEqual(progress.current_difficulty, "hard")
+        self.assertEqual(progress.correct_streak, 0)
+
+    def test_adaptive_next_question_returns_one_question_and_private_progress(self):
+        response = self.client.get(reverse("adaptive_quiz_next"), {"skill": "grammar", "level": "A1"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("question", response.data)
+        self.assertEqual(response.data["question"]["quiz_type"], "grammar")
+        self.assertNotIn("correct_option", response.data["question"])
+        self.assertEqual(response.data["progress"]["current_difficulty"], "medium")
+        self.client.force_authenticate(user=self.other)
+        other_progress = self.client.get(reverse("adaptive_quiz_progress"))
+        self.assertEqual(other_progress.data, [])
+
+    def test_adaptive_next_question_rejects_mixed_skill(self):
+        response = self.client.get(reverse("adaptive_quiz_next"), {"skill": "mixed"})
+        self.assertEqual(response.status_code, 400)
