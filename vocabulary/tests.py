@@ -23,6 +23,11 @@ class SharedVocabularyPermissionsTests(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 401)
 
+    def test_curated_vocabulary_has_a_substantial_bank_across_all_levels(self):
+        self.assertGreaterEqual(Word.objects.count(), 100)
+        for level in ("A1", "B1", "C1"):
+            self.assertTrue(Word.objects.filter(level=level).exists(), f"Missing vocabulary level {level}")
+
     def test_authenticated_learner_can_read_shared_words(self):
         Word.objects.create(english_word="curious", translation="کنجکاو", level="A1")
         self.client.force_authenticate(user=self.learner)
