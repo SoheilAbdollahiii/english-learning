@@ -34,6 +34,12 @@ def article_progress(request):
         ])
 
     article_id = request.data.get("article_id")
+    if isinstance(article_id, bool) or not str(article_id).strip().isdigit():
+        return Response({"article_id": "Enter a valid article ID."}, status=status.HTTP_400_BAD_REQUEST)
+    article_id = int(article_id)
+    if article_id < 1:
+        return Response({"article_id": "Enter a valid article ID."}, status=status.HTTP_400_BAD_REQUEST)
+
     completed = request.data.get("completed", True)
     if not isinstance(completed, bool):
         return Response({"completed": "Expected true or false."}, status=status.HTTP_400_BAD_REQUEST)
