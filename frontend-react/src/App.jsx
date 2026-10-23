@@ -1097,7 +1097,7 @@ export default function App() {
                     <button onClick={closeReadingLookup} aria-label={t('close')} className={`rounded-xl p-2 text-xl ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>×</button>
                   </header>
                   <div className="space-y-5 p-5 sm:p-6">
-                    {readingLookupBusy && !readingLookup.data ? <div className="flex items-center gap-3 py-8 text-sm"><span className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />{readingLookup.term ? t('reading_lookup_loading') : t('reading_sentence_translation')}</div> : null}
+                    {readingLookupBusy && !readingLookup.data ? <div className="flex items-center gap-3 py-8 text-sm"><span className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />{readingLookup.term ? t('reading_lookup_loading') : t('reading_sentence_loading')}</div> : null}
                     {readingLookup.data && (
                       <>
                         {readingLookup.term && (
