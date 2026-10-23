@@ -73,6 +73,17 @@ Run `python manage.py migrate` after pulling the changes so the personal data ta
 
 Without `GROQ_API_KEY`, the site still saves drafts but clearly reports that automated correction is unavailable.
 
+### Diagnose Groq access
+
+To inspect the configured provider and test whether the current API key can access Groq's model-list endpoint, run:
+
+```bash
+python manage.py diagnose_ai
+```
+
+The command reports the configured model, whether a key is present, and a concise diagnosis for common HTTP/network failures. It never prints the key or raw provider response. A successful model-list check does **not** guarantee that completion requests are authorized; if the check reports HTTP 403, verify the key's project/organization, account restrictions, and endpoint access in the Groq dashboard. The command makes one provider API request and should be run manually when you want to diagnose connectivity.
+
+
 ## Run the React frontend
 
 In another terminal:
