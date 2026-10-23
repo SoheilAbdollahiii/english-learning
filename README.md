@@ -91,6 +91,9 @@ npm run build
 
 ## Configuration
 
+See [Security and deployment baseline](SECURITY.md) for the production release checklist. `.env.example` is for local development only; do not deploy it unchanged.
+
+
 See `.env.example` for the environment variables. In production, use a strong secret key, set `DEBUG=False`, configure `ALLOWED_HOSTS` and `CORS_ALLOWED_ORIGINS` for your real domains, use HTTPS, and keep API credentials in your hosting provider's secret manager.
 
 ## CI checks
