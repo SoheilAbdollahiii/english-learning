@@ -318,7 +318,6 @@ export default function App() {
         }
         setQuizQuestions([data.question])
         setQuizAdaptiveProgress(data.progress || null)
-        setQuizAnswerMode('each')
         setQuizTimerMode('none')
         return
       }
@@ -1130,6 +1129,11 @@ export default function App() {
                         </span>
                       )}
                     </div>
+                    {quizAdaptiveMode && quizAdaptiveProgress && (
+                      <div role="status" className={`rounded-xl border px-4 py-3 text-sm ${darkMode ? 'border-indigo-800 bg-indigo-950/30 text-indigo-200' : 'border-indigo-200 bg-indigo-50 text-indigo-800'}`}>
+                        {t('quiz_adaptive_status', { skill: t(`quiz_${quizAdaptiveProgress.skill}`), difficulty: t(`difficulty_${quizAdaptiveProgress.current_difficulty}`), accuracy: quizAdaptiveProgress.accuracy })}
+                      </div>
+                    )}
 
                     <div>
                       <div className={`h-2.5 w-full overflow-hidden rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`} role="progressbar" aria-label={t('quiz_progress')} aria-valuemin={0} aria-valuemax={quizAdaptiveMode ? quizTargetCount : quizQuestions.length} aria-valuenow={currentQuestionIndex + 1}>

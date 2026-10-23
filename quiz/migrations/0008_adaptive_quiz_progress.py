@@ -41,6 +41,35 @@ def classify_question_topics(apps, schema_editor):
         question.topic = topic
         question.save(update_fields=["topic"])
 
+    # Earlier releases used CEFR as a proxy for difficulty, which meant (for
+    # example) that every A1 question was "easy" and could not adapt within A1.
+    # Recalibrate each skill/CEFR group by prompt-and-option length as a
+    # transparent initial estimate. Teachers can refine these labels in admin.
+    groups = Question.objects.values_list("quiz_type", "level").distinct()
+    for quiz_type, level in groups:
+        questions = list(Question.objects.filter(quiz_type=quiz_type, level=level))
+        if len(questions) < 3:
+            continue
+
+        def complexity(question):
+            prompt = " ".join([
+                question.question_text or "", question.option_a or "", question.option_b or "",
+                question.option_c or "", question.option_d or "",
+            ])
+            return (len(prompt), question.id)
+
+        ranked = sorted(questions, key=complexity)
+        easy_cutoff = (len(ranked) + 2) // 3
+        medium_cutoff = (2 * len(ranked) + 2) // 3
+        for index, question in enumerate(ranked):
+            if index < easy_cutoff:
+                difficulty = "easy"
+            elif index < medium_cutoff:
+                difficulty = "medium"
+            else:
+                difficulty = "hard"
+            Question.objects.filter(pk=question.pk).update(difficulty=difficulty)
+
 
 class Migration(migrations.Migration):
     dependencies = [

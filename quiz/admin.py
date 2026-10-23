@@ -4,8 +4,8 @@ from .models import Question, QuizSession
 
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
-    list_display = ("question_text", "quiz_type", "level", "difficulty", "correct_option")
-    list_filter = ("quiz_type", "level", "difficulty")
+    list_display = ("question_text", "quiz_type", "level", "topic", "difficulty", "correct_option")
+    list_filter = ("quiz_type", "level", "topic", "difficulty")
     search_fields = ("question_text",)
 
 

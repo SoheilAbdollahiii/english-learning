@@ -322,3 +322,15 @@ class LearningQuizTests(TestCase):
     def test_adaptive_next_question_rejects_mixed_skill(self):
         response = self.client.get(reverse("adaptive_quiz_next"), {"skill": "mixed"})
         self.assertEqual(response.status_code, 400)
+
+
+    def test_question_difficulty_is_varied_within_each_cefr_skill_group(self):
+        for skill in ("vocabulary", "reading", "grammar"):
+            for level in ("A1", "A2", "B1", "B2", "C1", "C2"):
+                difficulties = set(
+                    Question.objects.filter(quiz_type=skill, level=level).values_list("difficulty", flat=True)
+                )
+                self.assertGreaterEqual(
+                    len(difficulties), 2,
+                    f"Adaptive difficulty should vary within {skill}/{level}",
+                )
