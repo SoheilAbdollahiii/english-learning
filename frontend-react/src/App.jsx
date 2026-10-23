@@ -1142,7 +1142,7 @@ export default function App() {
                     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
                       <button
                         type="button"
-                        disabled={currentQuestionIndex === 0 || loadingQuiz}
+                        disabled={currentQuestionIndex === 0 || loadingQuiz || quizTimerMode === 'per-question'}
                         onClick={() => { setCurrentQuestionIndex((index) => Math.max(0, index - 1)); setQuizQuestionTimeLeft(quizPerQuestionDuration); setQuizError('') }}
                         className={`rounded-xl border px-4 py-2.5 text-sm font-bold disabled:opacity-40 ${darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'}`}
                       >
