@@ -193,6 +193,7 @@ export default function App() {
             setPreferences(preferencesData)
             setReadingLevel(preferencesData.preferred_level)
             setVocabLevel(preferencesData.preferred_level)
+            setQuizLevel(preferencesData.preferred_level)
           }
           setReadingProgress(Array.isArray(progressData) ? progressData : [])
           setQuizHistory(Array.isArray(historyData) ? historyData : [])
