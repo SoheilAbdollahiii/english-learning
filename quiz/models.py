@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 class QuizSession(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     quiz_type = models.CharField(max_length=50, default='vocabulary') # نوع کوییز مثل vocabulary یا reading
+    level = models.CharField(max_length=10, default='B1')
     score = models.IntegerField(default=0)
     total_questions = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
