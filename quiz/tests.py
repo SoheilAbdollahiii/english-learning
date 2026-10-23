@@ -38,6 +38,20 @@ class LearningQuizTests(TestCase):
         response = self.client.get(reverse("quiz_questions"), {"type": "made-up"})
         self.assertEqual(response.status_code, 400)
 
+    def test_invalid_cefr_level_is_rejected(self):
+        response = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "A2"})
+        self.assertEqual(response.status_code, 400)
+
+    def test_questions_from_another_level_cannot_be_submitted(self):
+        question = Question.objects.filter(quiz_type="grammar", level="A1").first()
+        response = self.client.post(
+            reverse("quiz_submit"),
+            {"quiz_type": "grammar", "level": "C1", "answers": {str(question.id): question.correct_option}},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(QuizSession.objects.count(), 0)
+
     def test_invalid_quiz_level_is_rejected(self):
         response = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "D2"})
         self.assertEqual(response.status_code, 400)
