@@ -73,6 +73,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "core.wsgi.application"
 
 DATABASE_URL = config("DATABASE_URL", default="").strip()
+DATABASE_SSL_REQUIRE = config("DATABASE_SSL_REQUIRE", default=not DEBUG, cast=bool)
 if DATABASE_URL:
     import dj_database_url
 
@@ -80,7 +81,7 @@ if DATABASE_URL:
         "default": dj_database_url.parse(
             DATABASE_URL,
             conn_max_age=600,
-            ssl_require=not DEBUG,
+            ssl_require=DATABASE_SSL_REQUIRE,
         )
     }
 else:
