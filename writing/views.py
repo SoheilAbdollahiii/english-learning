@@ -6,36 +6,52 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from rag.services import CorrectionUnavailable, correct_writing
 from .models import WritingSubmission
 from .serializers import WritingSubmissionSerializer
+
+
+MAX_CHARACTERS = 5000
+
+
+def _analyze_or_save_draft(text):
+    """Use the LLM when configured; never fabricate correction or feedback."""
+    try:
+        return correct_writing(text)
+    except CorrectionUnavailable:
+        return {
+            "corrected_text": "",
+            "feedback": (
+                "AI correction is unavailable. The original draft was saved without "
+                "automated correction; please try again later."
+            ),
+            "score": 0,
+        }
 
 
 @login_required
 @require_http_methods(["GET", "POST"])
 def writing_submit(request):
-    """Render the writing workspace and save submissions for the current user."""
+    """Save a user's draft and attach real LLM feedback when the service is configured."""
     if request.method == "POST":
         original_text = request.POST.get("original_text", "").strip()
-
         if not original_text:
             messages.error(request, "Please enter a piece of writing before submitting.")
-        elif len(original_text) > 5000:
+        elif len(original_text) > MAX_CHARACTERS:
             messages.error(request, "Your writing must be 5,000 characters or fewer.")
         else:
+            analysis = _analyze_or_save_draft(original_text)
             submission = WritingSubmission.objects.create(
                 user=request.user,
                 original_text=original_text,
-                corrected_text="",
-                feedback=(
-                    "Your writing has been saved. AI analysis is not available yet; "
-                    "your text has not been automatically corrected."
-                ),
-                score=0,
+                corrected_text=analysis["corrected_text"],
+                feedback=analysis["feedback"],
+                score=analysis["score"],
             )
-            messages.success(
-                request,
-                f"Writing saved successfully (submission #{submission.pk}).",
-            )
+            if analysis["corrected_text"]:
+                messages.success(request, f"Writing corrected and saved (submission #{submission.pk}).")
+            else:
+                messages.warning(request, f"Draft saved as #{submission.pk}; AI correction is currently unavailable.")
             return redirect("writing_submit")
 
     submissions = WritingSubmission.objects.filter(user=request.user).order_by("-created_at")
@@ -45,7 +61,7 @@ def writing_submit(request):
         {
             "submissions": submissions,
             "submission_count": submissions.count(),
-            "max_characters": 5000,
+            "max_characters": MAX_CHARACTERS,
         },
     )
 
@@ -53,11 +69,10 @@ def writing_submit(request):
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def manage_writings(request):
-    """JWT-authenticated API for a user's own writing submissions."""
+    """JWT-authenticated API scoped to the authenticated user's submissions."""
     if request.method == "GET":
         writings = WritingSubmission.objects.filter(user=request.user).order_by("-created_at")
-        serializer = WritingSubmissionSerializer(writings, many=True)
-        return Response(serializer.data)
+        return Response(WritingSubmissionSerializer(writings, many=True).data)
 
     serializer = WritingSubmissionSerializer(data=request.data)
     if not serializer.is_valid():
@@ -66,20 +81,18 @@ def manage_writings(request):
     original_text = serializer.validated_data.get("original_text", "").strip()
     if not original_text:
         return Response({"original_text": ["This field may not be blank."]}, status=400)
-    if len(original_text) > 5000:
+    if len(original_text) > MAX_CHARACTERS:
         return Response(
             {"original_text": ["Ensure this field has no more than 5000 characters."]},
             status=400,
         )
 
+    analysis = _analyze_or_save_draft(original_text)
     submission = serializer.save(
         user=request.user,
         original_text=original_text,
-        corrected_text="",
-        feedback=(
-            "Your writing has been saved. AI analysis is not available yet; "
-            "your text has not been automatically corrected."
-        ),
-        score=0,
+        corrected_text=analysis["corrected_text"],
+        feedback=analysis["feedback"],
+        score=analysis["score"],
     )
     return Response(WritingSubmissionSerializer(submission).data, status=201)

@@ -41,7 +41,7 @@
                 <button class="btn btn-primary btn-lg w-100" type="submit">Save my writing <span aria-hidden="true">→</span></button>
             </form>
             <div class="notice-panel mt-3">
-                <strong>Analysis status:</strong> Automatic AI correction is not connected yet. Your writing will be saved, and this page will not present a mock response as real AI feedback.
+                <strong>Analysis status:</strong> When GROQ_API_KEY is configured, your draft receives AI correction grounded in a retrieved grammar reference. If the service is unavailable, your original draft is saved without fabricated feedback.
             </div>
         </section>
     </div>
@@ -58,7 +58,11 @@
                             <time class="small text-secondary" datetime="{{ submission.created_at|date:'c' }}">{{ submission.created_at|date:"M j, Y · H:i" }}</time>
                         </div>
                         <p class="submission-preview">{{ submission.original_text|truncatechars:180 }}</p>
-                        <div class="d-flex align-items-center gap-2 small text-secondary"><span class="status-dot" aria-hidden="true"></span>Saved · AI analysis pending</div>
+                        {% if submission.corrected_text %}
+                        <div class="mt-3"><div class="small fw-bold text-success mb-1">AI-corrected version · Score {{ submission.score }}/100</div><p class="submission-preview">{{ submission.corrected_text }}</p></div>
+                        {% endif %}
+                        {% if submission.feedback %}<div class="notice-panel mt-2"><strong>Feedback:</strong> {{ submission.feedback }}</div>{% endif %}
+                        <div class="d-flex align-items-center gap-2 small text-secondary"><span class="status-dot" aria-hidden="true"></span>{% if submission.corrected_text %}AI correction complete{% else %}Saved · AI correction unavailable{% endif %}</div>
                     </article>
                     {% endfor %}
                 </div>
