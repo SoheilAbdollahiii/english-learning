@@ -12,6 +12,12 @@ class CorePageRoutingTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Build confidence.")
 
+    def test_login_page_renders_accessible_form(self):
+        response = self.client.get(reverse("login"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'autocomplete="username"')
+        self.assertContains(response, 'autocomplete="current-password"')
+
     def test_dashboard_redirects_anonymous_users_to_login(self):
         response = self.client.get(reverse("dashboard"))
         self.assertEqual(response.status_code, 302)
