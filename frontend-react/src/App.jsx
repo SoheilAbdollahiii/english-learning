@@ -796,13 +796,21 @@ export default function App() {
     if (dueWords.length > 0) startWordReview(dueWords[0])
   }
 
-  const submitWordReview = async (remembered) => {
+  const speakReviewWord = () => {
+    if (!activeReviewWord?.english_word || typeof window === 'undefined' || !('speechSynthesis' in window)) return
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(activeReviewWord.english_word)
+    utterance.lang = 'en-US'
+    window.speechSynthesis.speak(utterance)
+  }
+
+  const submitWordReview = async (quality) => {
     if (!activeReviewWord) return
     setReviewBusy(true)
     try {
       const res = await apiFetch(apiUrl(`/vocabulary/api/my-words/${activeReviewWord.id}/review/`), {
         method: 'POST',
-        body: JSON.stringify({ remembered })
+        body: JSON.stringify({ quality })
       })
       const data = await res.json()
       if (!res.ok) {
@@ -1319,15 +1327,19 @@ export default function App() {
                   </div>
                   {activeReviewWord ? (
                     <div className={`mt-4 p-4 rounded-xl border ${darkMode ? 'border-gray-700 bg-gray-900/40' : 'border-gray-200 bg-gray-50'}`}>
-                      <h4 className="text-2xl font-black mb-3" dir="ltr">{activeReviewWord.english_word}</h4>
+                      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                        <h4 className="text-2xl font-black" dir="ltr">{activeReviewWord.english_word}</h4>
+                        <button type="button" onClick={speakReviewWord} className="rounded-lg border px-3 py-2 text-sm font-bold hover:border-indigo-500" aria-label={t('listen_word')}>🔊 {t('listen_word')}</button>
+                      </div>
                       {!reviewAnswerVisible ? (
                         <button type="button" onClick={() => setReviewAnswerVisible(true)} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2">{t('reveal_answer')}</button>
                       ) : (
                         <>
                           <p className="text-indigo-500 font-bold mb-4">{activeReviewWord.translation || t('translation_missing')}</p>
                           <div className="flex flex-wrap gap-3">
-                            <button type="button" disabled={reviewBusy} onClick={() => submitWordReview(true)} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 disabled:opacity-50">{t('remembered')}</button>
-                            <button type="button" disabled={reviewBusy} onClick={() => submitWordReview(false)} className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2 disabled:opacity-50">{t('forgot')}</button>
+                            <button type="button" disabled={reviewBusy} onClick={() => submitWordReview('easy')} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 disabled:opacity-50">{t('review_easy')}</button>
+                            <button type="button" disabled={reviewBusy} onClick={() => submitWordReview('hard')} className="rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2 disabled:opacity-50">{t('review_hard')}</button>
+                            <button type="button" disabled={reviewBusy} onClick={() => submitWordReview('forgot')} className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2 disabled:opacity-50">{t('forgot')}</button>
                           </div>
                         </>
                       )}
