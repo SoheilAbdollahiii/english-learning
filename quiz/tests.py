@@ -108,6 +108,24 @@ class LearningQuizTests(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["total"], 1)
 
+    def test_question_ids_with_duplicate_normalized_values_are_rejected(self):
+        question = Question.objects.filter(quiz_type="grammar", level="A1").first()
+        response = self.client.post(
+            reverse("quiz_submit"),
+            {
+                "quiz_type": "grammar",
+                "level": "A1",
+                "answers": {
+                    str(question.id): question.correct_option,
+                    f"0{question.id}": question.correct_option,
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("only once", response.data["answers"])
+        self.assertEqual(QuizSession.objects.filter(user=self.learner).count(), 0)
+
     def test_nonpositive_question_ids_are_rejected(self):
         for question_id in ("0", "-1"):
             response = self.client.post(
