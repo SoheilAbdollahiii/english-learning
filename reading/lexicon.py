@@ -185,15 +185,39 @@ def _translate_to_persian(text):
     return ""
 
 
+WORD_DETAILS = {
+    "later": {"level": "A2", "phonetic": "/ˈleɪtər/", "synonyms": ["afterward", "subsequently"], "antonyms": ["earlier", "before"], "collocations": ["later today", "sooner or later", "ten minutes later"]},
+    "notice": {"level": "B1", "phonetic": "/ˈnoʊtɪs/", "synonyms": ["observe", "spot"], "antonyms": ["ignore", "overlook"], "collocations": ["notice a difference", "notice a change", "take notice"]},
+    "reach": {"level": "B1", "phonetic": "/riːtʃ/", "synonyms": ["arrive at", "get to"], "antonyms": ["leave"], "collocations": ["reach a goal", "reach an agreement", "reach out"]},
+    "strange": {"level": "B1", "phonetic": "/streɪndʒ/", "synonyms": ["unusual", "odd"], "antonyms": ["normal", "ordinary"], "collocations": ["strange feeling", "strange noise", "strange behavior"]},
+    "quiet": {"level": "A2", "phonetic": "/ˈkwaɪət/", "synonyms": ["silent", "peaceful"], "antonyms": ["noisy", "loud"], "collocations": ["quiet place", "keep quiet", "quiet voice"]},
+    "realize": {"level": "B1", "phonetic": "/ˈriːəlaɪz/", "synonyms": ["recognize", "understand"], "antonyms": ["misunderstand"], "collocations": ["realize a mistake", "suddenly realize", "realize that"]},
+    "improve": {"level": "A2", "phonetic": "/ɪmˈpruːv/", "synonyms": ["enhance", "develop"], "antonyms": ["worsen", "decline"], "collocations": ["improve skills", "improve performance", "improve your English"]},
+    "journey": {"level": "A2", "phonetic": "/ˈdʒɜːrni/", "synonyms": ["trip", "voyage"], "antonyms": [], "collocations": ["long journey", "journey home", "journey through life"]},
+    "available": {"level": "B1", "phonetic": "/əˈveɪləbl/", "synonyms": ["accessible", "obtainable"], "antonyms": ["unavailable"], "collocations": ["available online", "readily available", "available to everyone"]},
+    "decision": {"level": "B1", "phonetic": "/dɪˈsɪʒən/", "synonyms": ["choice", "verdict"], "antonyms": ["indecision"], "collocations": ["make a decision", "final decision", "difficult decision"]},
+    "discover": {"level": "B1", "phonetic": "/dɪˈskʌvər/", "synonyms": ["find", "uncover"], "antonyms": ["conceal"], "collocations": ["discover a fact", "discover a place", "discover that"]},
+    "provide": {"level": "B1", "phonetic": "/prəˈvaɪd/", "synonyms": ["supply", "offer"], "antonyms": ["withhold"], "collocations": ["provide information", "provide support", "provide someone with"]},
+    "support": {"level": "A2", "phonetic": "/səˈpɔːrt/", "synonyms": ["help", "assist"], "antonyms": ["oppose", "undermine"], "collocations": ["support a friend", "support a decision", "technical support"]},
+}
+
+
 def lookup_reading_text(term, sentence):
     entry = _dictionary_entry(term) if term else {}
     sentence_translation = _translate_to_persian(sentence)
+    details = WORD_DETAILS.get((term or "").lower(), {})
     return {
         "term": term,
         "term_type": entry.get("term_type", "sentence" if not term else "word"),
         "translation": entry.get("translation", ""),
         "definition": entry.get("definition", ""),
         "part_of_speech": entry.get("part_of_speech", ""),
+        "phonetic": details.get("phonetic", ""),
+        "meanings": [{"part_of_speech": entry.get("part_of_speech", ""), "definition": entry.get("definition", ""), "example": entry.get("example", "")}] if entry.get("definition") else [],
+        "synonyms": details.get("synonyms", []),
+        "antonyms": details.get("antonyms", []),
+        "collocations": details.get("collocations", []),
+        "level": details.get("level", "B1"),
         "example": entry.get("example", ""),
         "example_translation": entry.get("example_translation", ""),
         "sentence": sentence,
