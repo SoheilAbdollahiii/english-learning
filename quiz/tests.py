@@ -1,8 +1,9 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-from datetime import timedelta
 from rest_framework.test import APIClient
 
 from .models import Question, QuizSession
@@ -25,24 +26,64 @@ class LearningQuizTests(TestCase):
             self.assertGreaterEqual(len(response.data), 1)
             self.assertNotIn("correct_option", response.data[0])
 
+    def test_each_quiz_type_has_five_questions_at_every_supported_level(self):
+        for quiz_type in ("vocabulary", "reading", "grammar"):
+            for level in ("A1", "B1", "C1"):
+                response = self.client.get(reverse("quiz_questions"), {"type": quiz_type, "level": level})
+                self.assertEqual(response.status_code, 200, f"Missing {quiz_type} content at {level}")
+                self.assertEqual(len(response.data), 5)
+                self.assertTrue(all(item["level"] == level for item in response.data))
+                self.assertNotIn("correct_option", response.data[0])
+
+    def test_correct_answer_positions_are_not_identical_within_each_bank(self):
+        for quiz_type in ("vocabulary", "reading", "grammar"):
+            for level in ("A1", "B1", "C1"):
+                positions = set(
+                    Question.objects.filter(quiz_type=quiz_type, level=level).values_list("correct_option", flat=True)
+                )
+                self.assertGreaterEqual(len(positions), 2, f"Answer positions are too predictable for {quiz_type}/{level}")
+
+    def test_correct_answer_positions_are_not_biased_to_one_letter(self):
+        for quiz_type in ("vocabulary", "reading", "grammar"):
+            for level in ("A1", "B1", "C1"):
+                keys = set(Question.objects.filter(quiz_type=quiz_type, level=level).values_list("correct_option", flat=True))
+                self.assertGreaterEqual(len(keys), 2, f"Answer positions are too predictable for {quiz_type} {level}")
+
     def test_invalid_quiz_type_is_rejected(self):
         response = self.client.get(reverse("quiz_questions"), {"type": "made-up"})
         self.assertEqual(response.status_code, 400)
+
+    def test_invalid_cefr_level_is_rejected(self):
+        response = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "A2"})
+        self.assertEqual(response.status_code, 400)
+
+    def test_questions_from_another_level_cannot_be_submitted(self):
+        question = Question.objects.filter(quiz_type="grammar", level="A1").first()
+        response = self.client.post(
+            reverse("quiz_submit"),
+            {"quiz_type": "grammar", "level": "C1", "answers": {str(question.id): question.correct_option}},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(QuizSession.objects.count(), 0)
 
     def test_submitting_quiz_saves_result_and_history_is_private(self):
         question = Question.objects.filter(quiz_type="grammar").first()
         response = self.client.post(
             reverse("quiz_submit"),
-            {"quiz_type": "grammar", "answers": {str(question.id): question.correct_option}},
+            {"quiz_type": "grammar", "level": question.level, "answers": {str(question.id): question.correct_option}},
             format="json",
         )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["score"], 1)
         self.assertEqual(response.data["total"], 1)
+        self.assertEqual(response.data["level"], question.level)
         self.assertEqual(QuizSession.objects.filter(user=self.learner).count(), 1)
+        self.assertEqual(QuizSession.objects.get(user=self.learner).level, question.level)
         history = self.client.get(reverse("quiz_history"))
         self.assertEqual(len(history.data), 1)
         self.assertEqual(history.data[0]["quiz_type"], "grammar")
+        self.assertEqual(history.data[0]["level"], question.level)
         self.client.force_authenticate(user=self.other)
         self.assertEqual(len(self.client.get(reverse("quiz_history")).data), 0)
 
@@ -50,7 +91,7 @@ class LearningQuizTests(TestCase):
         question = Question.objects.filter(quiz_type="reading").first()
         response = self.client.post(
             reverse("quiz_submit"),
-            {"quiz_type": "vocabulary", "answers": {str(question.id): "A"}},
+            {"quiz_type": "vocabulary", "level": question.level, "answers": {str(question.id): "A"}},
             format="json",
         )
         self.assertEqual(response.status_code, 400)

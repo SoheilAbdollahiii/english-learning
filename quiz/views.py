@@ -13,6 +13,7 @@ from .serializers import QuestionSerializer
 
 
 QUIZ_TYPES = {"vocabulary", "reading", "grammar"}
+QUIZ_LEVELS = {"A1", "B1", "C1"}
 
 
 @api_view(["GET"])
@@ -22,10 +23,14 @@ def get_quiz_questions(request):
     if quiz_type not in QUIZ_TYPES:
         return Response({"detail": "Choose vocabulary, reading, or grammar."}, status=status.HTTP_400_BAD_REQUEST)
 
-    questions = list(Question.objects.filter(quiz_type=quiz_type).order_by("id"))
+    level = request.query_params.get("level", "B1").strip().upper()
+    if level not in QUIZ_LEVELS:
+        return Response({"detail": "Choose level A1, B1, or C1."}, status=status.HTTP_400_BAD_REQUEST)
+
+    questions = list(Question.objects.filter(quiz_type=quiz_type, level=level).order_by("id"))
     if not questions:
         return Response(
-            {"detail": "No questions are available for this quiz yet. Please contact the site administrator."},
+            {"detail": f"No questions are available for {quiz_type} at level {level} yet."},
             status=status.HTTP_404_NOT_FOUND,
         )
 
@@ -38,8 +43,11 @@ def get_quiz_questions(request):
 def submit_quiz(request):
     quiz_type = str(request.data.get("quiz_type", "vocabulary")).strip().lower()
     answers = request.data.get("answers", {})
+    level = str(request.data.get("level", "B1")).strip().upper()
     if quiz_type not in QUIZ_TYPES:
         return Response({"detail": "Choose vocabulary, reading, or grammar."}, status=status.HTTP_400_BAD_REQUEST)
+    if level not in QUIZ_LEVELS:
+        return Response({"detail": "Choose level A1, B1, or C1."}, status=status.HTTP_400_BAD_REQUEST)
     if not isinstance(answers, dict) or not answers:
         return Response({"answers": "Submit at least one answer."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -52,10 +60,13 @@ def submit_quiz(request):
 
     questions = {
         question.id: question
-        for question in Question.objects.filter(id__in=question_ids, quiz_type=quiz_type)
+        for question in Question.objects.filter(id__in=question_ids, quiz_type=quiz_type, level=level)
     }
-    if not questions:
-        return Response({"answers": "No valid questions were submitted for this quiz."}, status=status.HTTP_400_BAD_REQUEST)
+    if len(questions) != len(question_ids):
+        return Response(
+            {"answers": "All submitted questions must belong to the selected quiz type and level."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     score = 0
     details = []
@@ -84,11 +95,13 @@ def submit_quiz(request):
     QuizSession.objects.create(
         user=request.user,
         quiz_type=quiz_type,
+        level=level,
         score=score,
         total_questions=total,
     )
     return Response({
         "quiz_type": quiz_type,
+        "level": level,
         "score": score,
         "total": total,
         "percentage": round((score / total) * 100),
@@ -105,6 +118,7 @@ def quiz_history(request):
         {
             "id": session.id,
             "quiz_type": session.quiz_type,
+            "level": session.level,
             "score": session.score,
             "total_questions": session.total_questions,
             "percentage": round((session.score / session.total_questions) * 100) if session.total_questions else 0,
