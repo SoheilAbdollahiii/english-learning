@@ -115,15 +115,15 @@ def _dictionary_entry(term):
             entry["translation"] = _translate_to_persian(normalized)
         cache.set(cache_key, entry, 60 * 60 * 24)
         return entry
-    return {
+    fallback = {
         "definition": "Meaning depends on how this word is used in the sentence. Read the context and try the example.",
-        # Even when the dictionary has no entry (often true for phrasal verbs),
-        # still provide a Persian translation instead of an empty result.
         "translation": _translate_to_persian(normalized),
         "example": "",
         "example_translation": "",
         "term_type": "phrase" if " " in normalized else "word",
     }
+    cache.set(cache_key, fallback, 60 * 60 * 24)
+    return fallback
 
 
 def _translate_to_persian(text):
