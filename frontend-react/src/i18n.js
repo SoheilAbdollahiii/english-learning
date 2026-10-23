@@ -96,6 +96,8 @@ const resources = {
       delete: "Delete",
       save_to_my_words: "Save to my words",
       word_save_failed: "Could not save this word. Please try again.",
+      daily_goal_progress: "Daily word goal",
+      words_added_today: "Words saved today",
       word_saved: "Word \"{{word}}\" saved."
     }
   },
@@ -193,6 +195,8 @@ const resources = {
       delete: "حذف",
       save_to_my_words: "ذخیره در واژگان من",
       word_save_failed: "ذخیره واژه انجام نشد. لطفاً دوباره تلاش کنید.",
+      daily_goal_progress: "هدف روزانه واژگان",
+      words_added_today: "واژه‌های ذخیره‌شده امروز",
       word_saved: "واژه «{{word}}» ذخیره شد."
     }
   }
