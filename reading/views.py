@@ -53,3 +53,33 @@ def article_progress(request):
         {"article_id": progress.article_id, "completed": progress.completed, "updated_at": progress.updated_at},
         status=status.HTTP_200_OK,
     )
+
+
+@api_view(["GET"])
+def get_interactive_stories(request):
+    """Return curated branching stories without leaking comprehension answer keys."""
+    from .stories import public_stories
+
+    return Response(public_stories())
+
+
+@api_view(["POST"])
+def check_interactive_story_answer(request):
+    """Check a learner's answer without sending answer keys to the browser."""
+    from .stories import STORIES, check_story_answer
+
+    story_id = request.data.get("story_id")
+    node_id = request.data.get("node_id")
+    option_index = request.data.get("option_index")
+    if not isinstance(story_id, str) or not isinstance(node_id, str):
+        return Response({"detail": "A valid story_id and node_id are required."}, status=status.HTTP_400_BAD_REQUEST)
+    if isinstance(option_index, bool) or not isinstance(option_index, int):
+        return Response({"detail": "option_index must be an integer."}, status=status.HTTP_400_BAD_REQUEST)
+    if not any(story["id"] == story_id for story in STORIES):
+        return Response({"detail": "Story not found."}, status=status.HTTP_404_NOT_FOUND)
+    result = check_story_answer(story_id, node_id, option_index)
+    if result is None:
+        return Response({"detail": "Question not found."}, status=status.HTTP_404_NOT_FOUND)
+    if not result["valid"]:
+        return Response({"detail": result["explanation"]}, status=status.HTTP_400_BAD_REQUEST)
+    return Response({"correct": result["correct"], "explanation": result["explanation"]})
