@@ -41,6 +41,7 @@ export default function App() {
   const [loadingQuiz, setLoadingQuiz] = useState(false)
   const [quizType, setQuizType] = useState('vocabulary')
   const [quizLevel, setQuizLevel] = useState('B1')
+  const [quizQuestionCount, setQuizQuestionCount] = useState(5)
   const [quizTimerEnabled, setQuizTimerEnabled] = useState(false)
   const [quizTimeLeft, setQuizTimeLeft] = useState(90)
   const [quizTimeExpired, setQuizTimeExpired] = useState(false)
@@ -240,8 +241,8 @@ export default function App() {
 
   const startQuiz = async (type = 'vocabulary') => {
     setQuizType(type)
-    const level = preferences.preferred_level || 'B1'
-    setQuizLevel(level)
+    const level = quizLevel || preferences.preferred_level || 'B1'
+    const count = quizQuestionCount
     setQuizQuestions([])
     setQuizTimeLeft(90)
     setQuizTimeExpired(false)
@@ -253,7 +254,7 @@ export default function App() {
     setQuizAnswers({})
 
     try {
-      const res = await apiFetch(apiUrl(`/quiz/api/questions/?type=${type}&level=${level}`))
+      const res = await apiFetch(apiUrl(`/quiz/api/questions/?type=${type}&level=${level}&count=${count}`))
       const data = await res.json()
       if (res.ok) {
         setQuizQuestions(Array.isArray(data) ? data : [])
@@ -924,7 +925,23 @@ export default function App() {
                     <div className="text-5xl" aria-hidden="true">🎯</div>
                     <h3 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t('ready_quiz')}</h3>
                     <p className="text-gray-500 text-sm">{t('quiz_intro')}</p>
-                    <p className="text-xs font-bold text-indigo-500">{t('preferred_level')}: {preferences.preferred_level || 'B1'}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+                      <label className="space-y-2 text-sm font-semibold">
+                        <span>{t('quiz_level_setting')}</span>
+                        <select value={quizLevel} onChange={(event) => setQuizLevel(event.target.value)} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                          <option value="A1">A1 · Beginner</option>
+                          <option value="B1">B1 · Intermediate</option>
+                          <option value="C1">C1 · Advanced</option>
+                          <option value="all">{t('all_levels')}</option>
+                        </select>
+                      </label>
+                      <label className="space-y-2 text-sm font-semibold">
+                        <span>{t('quiz_count_setting')}</span>
+                        <select value={quizQuestionCount} onChange={(event) => setQuizQuestionCount(Number(event.target.value))} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                          {[5, 10, 15, 20, 30].map((count) => <option key={count} value={count}>{count}</option>)}
+                        </select>
+                      </label>
+                    </div>
                     <label className={`inline-flex items-center justify-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold ${darkMode ? 'border-gray-700 bg-gray-900/40 text-gray-200' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>
                       <input
                         type="checkbox"
