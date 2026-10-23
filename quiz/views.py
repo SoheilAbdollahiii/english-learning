@@ -1,4 +1,7 @@
 import random
+from datetime import timedelta
+
+from django.utils import timezone
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -109,3 +112,38 @@ def quiz_history(request):
         }
         for session in sessions
     ])
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def quiz_stats(request):
+    """Return accurate per-user quiz streak and daily activity for the dashboard."""
+    today = timezone.localdate()
+    active_dates = set(
+        QuizSession.objects.filter(user=request.user).dates("created_at", "day", order="DESC")
+    )
+    cursor = today if today in active_dates else today - timedelta(days=1)
+    current_streak = 0
+    while cursor in active_dates:
+        current_streak += 1
+        cursor -= timedelta(days=1)
+
+    first_day = today - timedelta(days=6)
+    counts = { (first_day + timedelta(days=offset)).isoformat(): 0 for offset in range(7) }
+    recent_sessions = QuizSession.objects.filter(
+        user=request.user,
+        created_at__date__gte=first_day,
+        created_at__date__lte=today,
+    ).values_list("created_at", flat=True)
+    for created_at in recent_sessions:
+        day_key = timezone.localdate(created_at).isoformat()
+        if day_key in counts:
+            counts[day_key] += 1
+
+    return Response({
+        "current_streak": current_streak,
+        "quiz_sessions_total": QuizSession.objects.filter(user=request.user).count(),
+        "daily_activity": [
+            {"date": day, "count": count} for day, count in counts.items()
+        ],
+    })
