@@ -1,6 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts'
+
+function calculateCurrentStreak() {
+  const today = new Date().toDateString()
+  const lastLogin = localStorage.getItem('last_login_date')
+  const storedStreak = Number.parseInt(localStorage.getItem('user_streak') || '0', 10)
+  if (lastLogin === today) return storedStreak
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  return lastLogin === yesterday.toDateString() ? storedStreak + 1 : 1
+}
 
 async function apiFetch(url, options = {}) {
   let token = localStorage.getItem('access_token');
@@ -30,14 +40,16 @@ async function apiFetch(url, options = {}) {
           headers['Authorization'] = `Bearer ${data.access}`;
           response = await fetch(url, { ...options, headers });
         } else {
-          localStorage.clear();
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
           window.location.reload();
         }
       } catch (err) {
         console.error("Token refresh failed", err);
       }
     } else {
-      localStorage.clear();
+      localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
       window.location.reload();
     }
   }
@@ -51,7 +63,7 @@ export default function App() {
   const [words, setWords] = useState([])
   const [articles, setArticles] = useState([])
   const [writings, setWritings] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(() => !!localStorage.getItem('access_token'))
   
   const [writingText, setWritingText] = useState('')
   const [submittingWriting, setSubmittingWriting] = useState(false)
@@ -64,18 +76,38 @@ export default function App() {
   const [quizResult, setQuizResult] = useState(null)
   const [loadingQuiz, setLoadingQuiz] = useState(false)
   
-  const [darkMode, setDarkMode] = useState(false)
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('english-learning-theme') === 'dark')
   
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('access_token'))
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
 
-  const [streak, setStreak] = useState(0)
-  const [chartData, setChartData] = useState([])
+  const [streak] = useState(calculateCurrentStreak)
+  const chartData = useMemo(() => {
+    const daysFa = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه']
+    const daysEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const currentDays = i18n.language === 'fa' ? daysFa : daysEn
+    const data = []
+    for (let i = 6; i >= 0; i--) {
+      const day = new Date()
+      day.setDate(day.getDate() - i)
+      data.push({
+        name: currentDays[day.getDay()],
+        words: i === 0 ? words.length : Math.max(0, words.length - (i * 2))
+      })
+    }
+    return data
+  }, [i18n.language, words.length])
 
   useEffect(() => {
-    document.dir = i18n.language === 'fa' ? 'rtl' : 'ltr'
+    document.documentElement.lang = i18n.language === 'fa' ? 'fa' : 'en'
+    document.documentElement.dir = i18n.language === 'fa' ? 'rtl' : 'ltr'
+    localStorage.setItem('english-learning-language', i18n.language)
   }, [i18n.language])
+
+  useEffect(() => {
+    localStorage.setItem('english-learning-theme', darkMode ? 'dark' : 'light')
+  }, [darkMode])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -89,28 +121,36 @@ export default function App() {
         const data = await res.json()
         localStorage.setItem('access_token', data.access)
         localStorage.setItem('refresh_token', data.refresh)
+        setLoading(true)
         setIsLoggedIn(true)
       } else {
         alert(t('invalid_login'))
       }
     } catch (err) {
       console.error('Login failed', err)
+      alert(t('login_failed'))
     }
   }
 
   const handleLogout = () => {
-    localStorage.clear()
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
     setIsLoggedIn(false)
   }
 
+  const changeTab = (tab) => {
+    if (tab !== activeTab) setLoading(true)
+    setActiveTab(tab)
+  }
+
   const toggleLanguage = () => {
-    i18n.changeLanguage(i18n.language === 'en' ? 'fa' : 'en')
+    const nextLanguage = i18n.language === 'en' ? 'fa' : 'en'
+    localStorage.setItem('english-learning-language', nextLanguage)
+    i18n.changeLanguage(nextLanguage)
   }
 
   useEffect(() => {
     if (!isLoggedIn) return
-
-    setLoading(true)
 
     if (activeTab === 'dashboard') {
       Promise.all([
@@ -200,40 +240,12 @@ export default function App() {
 
   useEffect(() => {
     if (!isLoggedIn) return;
-
     const today = new Date().toDateString();
-    const lastLogin = localStorage.getItem('last_login_date');
-    let currentStreak = parseInt(localStorage.getItem('user_streak') || '0', 10);
-
-    if (lastLogin !== today) {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      
-      if (lastLogin === yesterday.toDateString()) {
-        currentStreak += 1;
-      } else {
-        currentStreak = 1;
-      }
+    if (localStorage.getItem('last_login_date') !== today) {
       localStorage.setItem('last_login_date', today);
-      localStorage.setItem('user_streak', currentStreak.toString());
+      localStorage.setItem('user_streak', String(streak));
     }
-    setStreak(currentStreak);
-
-    const daysFa = ['یک', 'دو', 'سه', 'چهار', 'پنج', 'جمعه', 'شنبه'];
-    const daysEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const currentDays = i18n.language === 'fa' ? daysFa : daysEn;
-    
-    const newChartData = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      newChartData.push({
-        name: currentDays[d.getDay()],
-        words: i === 0 ? words.length : Math.max(0, words.length - (i * 2))
-      });
-    }
-    setChartData(newChartData);
-  }, [isLoggedIn, i18n.language, words.length]);
+  }, [isLoggedIn, streak]);
 
   const handleWordClick = async (word) => {
     const mockTranslation = "ترجمه: " + word; 
@@ -248,7 +260,7 @@ export default function App() {
         })
       });
       if (res.ok) {
-        alert(i18n.language === 'fa' ? `لغت "${word}" ذخیره شد.` : `Word "${word}" saved!`);
+        alert(t('word_saved', { word }));
       }
     } catch (err) {
       console.error('Error saving word:', err);
@@ -270,10 +282,13 @@ export default function App() {
         const newSubmission = await res.json();
         setWritings([newSubmission, ...writings]);
         setWritingText('');
-        alert(i18n.language === 'fa' ? 'متن شما با موفقیت توسط هوش مصنوعی بررسی شد!' : 'Writing analyzed successfully!');
+        alert(newSubmission.corrected_text ? t('writing_analyzed') : t('writing_saved'));
+      } else {
+        alert(t('writing_failed'));
       }
     } catch (err) {
       console.error('Error submitting writing:', err);
+      alert(t('writing_failed'));
     } finally {
       setSubmittingWriting(false);
     }
@@ -299,11 +314,11 @@ export default function App() {
             </button>
           </form>
           <div className="flex gap-2 pt-4">
-            <button onClick={toggleLanguage} className="flex-1 text-sm font-bold text-gray-500 hover:text-indigo-600 transition-colors">
+            <button onClick={toggleLanguage} title={t('language_toggle')} aria-label={t('language_toggle')} className="flex-1 text-sm font-bold text-gray-500 hover:text-indigo-600 transition-colors">
               {i18n.language === 'en' ? '🇮🇷 فارسی' : '🇬🇧 English'}
             </button>
-            <button onClick={() => setDarkMode(!darkMode)} className="flex-1 text-sm font-bold text-gray-500 hover:text-indigo-600 transition-colors">
-              {darkMode ? '☀️ روشن' : '🌙 تاریک'}
+            <button onClick={() => setDarkMode(!darkMode)} title={t(darkMode ? 'light_mode' : 'dark_mode')} aria-label={t('theme_toggle')} className="flex-1 text-sm font-bold text-gray-500 hover:text-indigo-600 transition-colors">
+              {darkMode ? '☀️' : '🌙'}
             </button>
           </div>
         </div>
@@ -324,28 +339,28 @@ export default function App() {
               </div>
               
               <div className="flex gap-3 sm:gap-6">
-                <button onClick={() => setActiveTab('dashboard')} className={`px-1 pt-1 border-b-2 text-sm font-bold transition-colors ${activeTab === 'dashboard' ? 'border-indigo-600 text-indigo-500' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-                  {i18n.language === 'en' ? 'Dashboard' : 'داشبورد'}
+                <button onClick={() => changeTab('dashboard')} className={`px-1 pt-1 border-b-2 text-sm font-bold transition-colors ${activeTab === 'dashboard' ? 'border-indigo-600 text-indigo-500' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                  {t('tab_dashboard')}
                 </button>
-                <button onClick={() => setActiveTab('reading')} className={`px-1 pt-1 border-b-2 text-sm font-bold transition-colors ${activeTab === 'reading' ? 'border-indigo-600 text-indigo-500' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                <button onClick={() => changeTab('reading')} className={`px-1 pt-1 border-b-2 text-sm font-bold transition-colors ${activeTab === 'reading' ? 'border-indigo-600 text-indigo-500' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
                   {t('tab_reading')}
                 </button>
-                <button onClick={() => setActiveTab('vocabulary')} className={`px-1 pt-1 border-b-2 text-sm font-bold transition-colors ${activeTab === 'vocabulary' ? 'border-indigo-600 text-indigo-500' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                <button onClick={() => changeTab('vocabulary')} className={`px-1 pt-1 border-b-2 text-sm font-bold transition-colors ${activeTab === 'vocabulary' ? 'border-indigo-600 text-indigo-500' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
                   {t('tab_vocabulary')}
                 </button>
-                <button onClick={() => setActiveTab('writing')} className={`px-1 pt-1 border-b-2 text-sm font-bold transition-colors ${activeTab === 'writing' ? 'border-indigo-600 text-indigo-500' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-                  {i18n.language === 'en' ? 'AI Writing' : 'رایتینگ'}
+                <button onClick={() => changeTab('writing')} className={`px-1 pt-1 border-b-2 text-sm font-bold transition-colors ${activeTab === 'writing' ? 'border-indigo-600 text-indigo-500' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                  {t('tab_writing')}
                 </button>
-                <button onClick={() => setActiveTab('quiz')} className={`px-1 pt-1 border-b-2 text-sm font-bold transition-colors ${activeTab === 'quiz' ? 'border-indigo-600 text-indigo-500' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-                  {i18n.language === 'en' ? 'Quiz' : 'آزمون'}
+                <button onClick={() => changeTab('quiz')} className={`px-1 pt-1 border-b-2 text-sm font-bold transition-colors ${activeTab === 'quiz' ? 'border-indigo-600 text-indigo-500' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                  {t('tab_quiz')}
                 </button>
               </div>
 
               <div className="flex items-center gap-3">
-                <button onClick={toggleLanguage} className="text-lg hover:scale-110 transition-transform p-1">
+                <button onClick={toggleLanguage} title={t('language_toggle')} aria-label={t('language_toggle')} className="text-lg hover:scale-110 transition-transform p-1">
                   {i18n.language === 'en' ? '🇮🇷' : '🇬🇧'}
                 </button>
-                <button onClick={() => setDarkMode(!darkMode)} className="text-lg hover:scale-110 transition-transform p-1">
+                <button onClick={() => setDarkMode(!darkMode)} title={t(darkMode ? 'light_mode' : 'dark_mode')} aria-label={t('theme_toggle')} className="text-lg hover:scale-110 transition-transform p-1">
                   {darkMode ? '☀️' : '🌙'}
                 </button>
                 <button onClick={handleLogout} className="text-sm font-bold text-red-500 hover:text-red-700 bg-red-50 dark:bg-red-950/30 px-3 py-1.5 rounded-lg transition-colors">
@@ -359,7 +374,7 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="mb-10 text-center">
           <h1 className={`text-4xl font-black mb-3 tracking-tight ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-            {activeTab === 'reading' ? t('reading_title') : activeTab === 'vocabulary' ? t('vocab_title') : activeTab === 'writing' ? (i18n.language === 'en' ? 'AI Writing Assistant' : 'دستیار رایتینگ هوشمند') : activeTab === 'quiz' ? (i18n.language === 'en' ? 'Skill Assessment Quiz' : 'آزمون سنجش مهارت') : (i18n.language === 'en' ? 'Your Dashboard' : 'داشبورد شما')}
+            {activeTab === 'reading' ? t('reading_title') : activeTab === 'vocabulary' ? t('vocab_title') : activeTab === 'writing' ? t('writing_title') : activeTab === 'quiz' ? t('quiz_title') : t('dashboard_title')}
           </h1>
         </div>
 
@@ -386,14 +401,14 @@ export default function App() {
                     <p className="text-5xl font-black text-green-500">{articles.length}</p>
                   </div>
                   <div className={`p-6 rounded-2xl shadow-sm border flex flex-col justify-center items-center transition-shadow ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-                    <h3 className="text-gray-400 font-bold mb-2">{i18n.language === 'en' ? 'Daily Streak' : 'روزهای متوالی'}</h3>
+                    <h3 className="text-gray-400 font-bold mb-2">{t('daily_streak')}</h3>
                     <p className="text-5xl font-black text-orange-500">{streak} ⚡</p>
                   </div>
                 </div>
                 
                 <div className={`p-6 rounded-2xl shadow-sm border h-96 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                   <h3 className={`text-lg font-bold mb-6 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                    {i18n.language === 'en' ? 'Activity (Last 7 Days)' : 'فعالیت ۷ روز گذشته'}
+                    {t('activity_last_7_days')}
                   </h3>
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData}>
@@ -450,7 +465,7 @@ export default function App() {
                       
                       <div className="mt-auto">
                         <div className="flex justify-between text-xs font-bold mb-2">
-                          <span className="text-gray-400">{i18n.language === 'en' ? 'Mastery' : 'میزان تسلط'}</span>
+                          <span className="text-gray-400">{t('mastery')}</span>
                           <span className="text-indigo-500">{word.proficiency || 0}%</span>
                         </div>
                         <div className={`w-full rounded-full h-2.5 mb-4 overflow-hidden ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
@@ -474,14 +489,14 @@ export default function App() {
               <div className="space-y-8">
                 <div className={`p-6 rounded-3xl shadow-sm border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                   <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                    {i18n.language === 'en' ? 'Write something in English for AI analysis:' : 'متن انگلیسی خود را برای بررسی هوش مصنوعی بنویسید:'}
+                    {t('writing_prompt')}
                   </h3>
                   <form onSubmit={handleWritingSubmit} className="space-y-4">
                     <textarea 
                       rows="4" 
                       value={writingText}
                       onChange={(e) => setWritingText(e.target.value)}
-                      placeholder={i18n.language === 'en' ? 'Type your paragraph here...' : 'پاراگراف خود را اینجا بنویسید...'}
+                      placeholder={t('writing_placeholder')}
                       className={`w-full p-4 rounded-2xl border focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-200 text-gray-900 placeholder-gray-400'}`}
                       dir="ltr"
                       required
@@ -491,38 +506,39 @@ export default function App() {
                       disabled={submittingWriting}
                       className="py-3 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors shadow-sm disabled:opacity-50"
                     >
-                      {submittingWriting ? (i18n.language === 'en' ? 'Analyzing...' : 'در حال تحلیل...') : (i18n.language === 'en' ? 'Analyze with AI' : 'ارسال برای تحلیل هوش مصنوعی')}
+                      {submittingWriting ? t('analyzing') : t('analyze_with_ai')}
                     </button>
                   </form>
                 </div>
 
                 <div className="space-y-6">
                   <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                    {i18n.language === 'en' ? 'Your Writing History' : 'تاریخچه رایتینگ‌های شما'}
+                    {t('writing_history')}
                   </h3>
                   
                   {writings.length === 0 ? (
-                    <EmptyState message={i18n.language === 'en' ? 'No writing submissions yet.' : 'هنوز رایتینگی ثبت نشده است.'} darkMode={darkMode} />
+                    <EmptyState message={t('no_writings')} darkMode={darkMode} />
                   ) : (
                     writings.map((item) => (
                       <div key={item.id} className={`p-6 rounded-2xl shadow-sm border space-y-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                         <div className="flex justify-between items-center">
-                          <span className="text-xs text-gray-400 font-bold">{new Date(item.created_at).toLocaleDateString()}</span>
+                          <span className="text-xs text-gray-400 font-bold">{new Date(item.created_at).toLocaleDateString(i18n.language === 'fa' ? 'fa-IR' : 'en-US')}</span>
                           <span className="bg-indigo-50 dark:bg-indigo-950 text-indigo-600 font-black text-sm px-3 py-1 rounded-full">
-                            {i18n.language === 'en' ? `Score: ${item.score}/100` : `امتیاز: ${item.score} از ۱۰۰`}
+                            {t('score_value', { score: item.score })}
                           </span>
                         </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                           <div className={`p-4 rounded-xl border ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
-                            <span className="block text-xs font-bold text-gray-400 mb-1">Original Text:</span>
+                            <span className="block text-xs font-bold text-gray-400 mb-1">{t('original_text')}:</span>
                             <p className="font-medium text-justify" dir="ltr">{item.original_text}</p>
                           </div>
                           <div className={`p-4 rounded-xl border ${darkMode ? 'bg-indigo-950/20 border-indigo-900/50' : 'bg-indigo-50/50 border-indigo-100'}`}>
-                            <span className="block text-xs font-bold text-indigo-500 mb-1">AI Corrected Version:</span>
-                            <p className="font-medium text-justify text-indigo-600 dark:text-indigo-300" dir="ltr">{item.corrected_text}</p>
+                            <span className="block text-xs font-bold text-indigo-500 mb-1">{t('corrected_text')}:</span>
+                            {item.corrected_text ? <p className="font-medium text-justify text-indigo-600 dark:text-indigo-300" dir="ltr">{item.corrected_text}</p> : <p className="text-sm text-amber-600">{t('correction_unavailable')}</p>}
                           </div>
                         </div>
+                        {item.feedback && <div className={`p-4 rounded-xl border text-sm ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-gray-50 border-gray-200'}`}><strong>{t('feedback')}:</strong> {item.feedback}</div>}
                       </div>
                     ))
                   )}
@@ -537,17 +553,17 @@ export default function App() {
                   <div className={`p-8 rounded-3xl shadow-sm border text-center space-y-6 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                     <div className="text-5xl">🎯</div>
                     <h3 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {i18n.language === 'en' ? 'Ready to test your knowledge?' : 'آماده‌ای دانش خود رو بسنجی؟'}
+                      {t('ready_quiz')}
                     </h3>
                     <p className="text-gray-500 text-sm">
-                      {i18n.language === 'en' ? 'Take a short quiz based on your learned vocabulary and skills with detailed explanations.' : 'یک آزمون کوتاه همراه با توضیحات آموزشی برای ارتقای یادگیری بدهید.'}
+                      {t('quiz_intro')}
                     </p>
                     <button 
                       onClick={() => startQuiz('vocabulary')}
                       disabled={loadingQuiz}
                       className="py-3 px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-colors shadow-sm"
                     >
-                      {loadingQuiz ? (i18n.language === 'en' ? 'Loading...' : 'در حال بارگذاری...') : (i18n.language === 'en' ? 'Start Vocabulary Quiz' : 'شروع آزمون لغت')}
+                      {loadingQuiz ? t('loading') : t('start_vocabulary_quiz')}
                     </button>
                   </div>
                 )}
@@ -555,7 +571,7 @@ export default function App() {
                 {quizQuestions.length > 0 && !quizSubmitted && (
                   <div className={`p-8 rounded-3xl shadow-sm border space-y-6 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                     <div className="flex justify-between items-center text-xs font-bold text-gray-400">
-                      <span>{i18n.language === 'en' ? `Question ${currentQuestionIndex + 1} of ${quizQuestions.length}` : `سوال ${currentQuestionIndex + 1} از ${quizQuestions.length}`}</span>
+                      <span>{t('question_counter', { current: currentQuestionIndex + 1, total: quizQuestions.length })}</span>
                       <span>{quizQuestions[currentQuestionIndex].level}</span>
                     </div>
 
@@ -590,15 +606,15 @@ export default function App() {
                     <div className="text-center space-y-4">
                       <div className="text-5xl">🏆</div>
                       <h3 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {i18n.language === 'en' ? 'Quiz Completed & Analyzed!' : 'آزمون به پایان رسید و تحلیل شد!'}
+                        {t('quiz_completed')}
                       </h3>
                       <div className="flex justify-center gap-8 py-2">
                         <div>
-                          <span className="block text-gray-400 text-xs font-bold">{i18n.language === 'en' ? 'Score' : 'امتیاز'}</span>
+                          <span className="block text-gray-400 text-xs font-bold">{t('score')}</span>
                           <span className="text-2xl font-black text-indigo-500">{quizResult.score} / {quizResult.total}</span>
                         </div>
                         <div>
-                          <span className="block text-gray-400 text-xs font-bold">{i18n.language === 'en' ? 'Percentage' : 'درصد موفقیت'}</span>
+                          <span className="block text-gray-400 text-xs font-bold">{t('percentage')}</span>
                           <span className="text-2xl font-black text-green-500">{quizResult.percentage}%</span>
                         </div>
                       </div>
@@ -607,7 +623,7 @@ export default function App() {
                     {/* بخش مرور پاسخ‌ها و توضیحات آموزشی */}
                     <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                       <h4 className={`font-bold text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                        {i18n.language === 'en' ? 'Detailed Explanations & Review:' : 'مرور پاسخ‌ها و توضیحات آموزشی:'}
+                        {t('explanations_review')}: 
                       </h4>
                       {quizResult.details.map((item, idx) => (
                         <div key={idx} className={`p-4 rounded-xl border text-sm space-y-2 ${
@@ -618,11 +634,11 @@ export default function App() {
                           <div className="flex justify-between font-bold" dir="ltr">
                             <span className={darkMode ? 'text-white' : 'text-gray-800'}>{idx + 1}. {item.question_text}</span>
                             <span className={item.is_correct ? 'text-green-500' : 'text-red-500'}>
-                              {item.is_correct ? '✓ Correct' : `✗ Correct was: ${item.correct_answer}`}
+                              {item.is_correct ? `✓ ${t('correct')}` : `✗ ${t('correct_was', { answer: item.correct_answer })}`}
                             </span>
                           </div>
                           <p className={`text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                            💡 <span className="font-bold">Explanation:</span> {item.explanation}
+                            💡 <span className="font-bold">{t('explanation')}:</span> {item.explanation}
                           </p>
                         </div>
                       ))}
@@ -633,7 +649,7 @@ export default function App() {
                         onClick={() => setQuizQuestions([])}
                         className="py-3 px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-colors shadow-sm"
                       >
-                        {i18n.language === 'en' ? 'Take Another Quiz' : 'آزمون مجدد'}
+                        {t('take_another_quiz')}
                       </button>
                     </div>
                   </div>
