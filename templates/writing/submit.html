@@ -1,50 +1,85 @@
 {% extends 'base.html' %}
 
+{% block title %}Writing Studio · English Studio{% endblock %}
+
 {% block content %}
-<div class="row">
-    <div class="col-md-8 mx-auto">
-        <h2 class="mb-4">Writing Practice</h2>
-        
-        <form method="post" class="mb-4">
-            {% csrf_token %}
-            <div class="mb-3">
-                <label for="text" class="form-label">Write a short English paragraph:</label>
-                <textarea name="text" id="text" class="form-control" rows="6" required>{{ user_text }}</textarea>
+<section class="writing-hero rounded-4 p-4 p-lg-5 mb-4">
+    <div class="row align-items-center g-4">
+        <div class="col-lg-8">
+            <span class="eyebrow">YOUR WRITING STUDIO</span>
+            <h1 class="display-6 fw-bold mt-2 mb-3">Make space for better English.</h1>
+            <p class="lead mb-0">Write freely, save your practice, and revisit your progress in one calm workspace.</p>
+        </div>
+        <div class="col-lg-4">
+            <div class="stat-panel">
+                <span class="stat-number">{{ submission_count }}</span>
+                <span class="stat-label">saved practice{% if submission_count != 1 %}s{% endif %}</span>
             </div>
-            <button type="submit" class="btn btn-primary w-100">Analyze & Correct</button>
-        </form>
+        </div>
+    </div>
+</section>
 
-        <!-- نمایش خطاهای سیستمی (مثلا قطعی اینترنت) -->
-        {% if error_message %}
-            <div class="alert alert-danger">
-                <strong>System Error:</strong> {{ error_message }}
+<div class="row g-4">
+    <div class="col-lg-7">
+        <section class="surface-card p-4 p-lg-5 h-100">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <div>
+                    <span class="eyebrow">01 / PRACTICE</span>
+                    <h2 class="h4 fw-bold mt-2 mb-0">What would you like to say?</h2>
+                </div>
+                <span class="soft-pill">Up to {{ max_characters }} characters</span>
             </div>
-        {% endif %}
-
-        <!-- نمایش بازخورد هوش مصنوعی -->
-        {% if corrections is not None %}
-            <h4 class="mt-5 mb-3">AI Feedback</h4>
-            
-            {% if corrections|length > 0 %}
-                <div class="list-group">
-                {% for item in corrections %}
-                    <div class="list-group-item list-group-item-action mb-2 border rounded">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1 text-danger"><s>{{ item.error }}</s></h6>
-                            <h6 class="text-success fw-bold">{{ item.correction }}</h6>
+            <p class="text-secondary">Write a paragraph, a journal entry, or a short story. Your text is saved privately to your account.</p>
+            <form method="post" action="{% url 'writing_submit' %}">
+                {% csrf_token %}
+                <label class="form-label fw-semibold" for="original_text">Your English text</label>
+                <textarea class="form-control writing-editor" id="original_text" name="original_text" rows="9" maxlength="{{ max_characters }}" placeholder="Yesterday, I went for a walk and..." required aria-describedby="writing-help character-count"></textarea>
+                <div class="d-flex justify-content-between gap-3 mt-2 mb-4">
+                    <small id="writing-help" class="text-secondary">A first draft is always a good start.</small>
+                    <small id="character-count" class="text-secondary text-nowrap" aria-live="polite">0 / {{ max_characters }}</small>
+                </div>
+                <button class="btn btn-primary btn-lg w-100" type="submit">Save my writing <span aria-hidden="true">→</span></button>
+            </form>
+            <div class="notice-panel mt-3">
+                <strong>Analysis status:</strong> Automatic AI correction is not connected yet. Your writing will be saved, and this page will not present a mock response as real AI feedback.
+            </div>
+        </section>
+    </div>
+    <div class="col-lg-5">
+        <section class="surface-card p-4 p-lg-5 h-100">
+            <span class="eyebrow">02 / YOUR JOURNAL</span>
+            <h2 class="h4 fw-bold mt-2 mb-4">Recent practice</h2>
+            {% if submissions %}
+                <div class="submission-list">
+                    {% for submission in submissions %}
+                    <article class="submission-item">
+                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                            <span class="soft-pill">Practice #{{ submission.pk }}</span>
+                            <time class="small text-secondary" datetime="{{ submission.created_at|date:'c' }}">{{ submission.created_at|date:"M j, Y · H:i" }}</time>
                         </div>
-                        <p class="mb-1 mt-2 text-muted">
-                            <strong>Reason:</strong> {{ item.reason }}
-                        </p>
-                    </div>
-                {% endfor %}
+                        <p class="submission-preview">{{ submission.original_text|truncatechars:180 }}</p>
+                        <div class="d-flex align-items-center gap-2 small text-secondary"><span class="status-dot" aria-hidden="true"></span>Saved · AI analysis pending</div>
+                    </article>
+                    {% endfor %}
                 </div>
             {% else %}
-                <div class="alert alert-success">
-                    Excellent! No grammatical errors found in your text.
+                <div class="empty-state text-center py-5 px-3">
+                    <div class="empty-icon mb-3" aria-hidden="true">✎</div>
+                    <h3 class="h6 fw-bold">Your journal starts here</h3>
+                    <p class="text-secondary small mb-0">Your saved writing will appear here, visible only to you.</p>
                 </div>
             {% endif %}
-        {% endif %}
+        </section>
     </div>
 </div>
+<script>
+(function () {
+    const editor = document.getElementById("original_text");
+    const counter = document.getElementById("character-count");
+    if (!editor || !counter) return;
+    const updateCount = function () { counter.textContent = editor.value.length + " / " + editor.maxLength; };
+    editor.addEventListener("input", updateCount);
+    updateCount();
+})();
+</script>
 {% endblock %}
