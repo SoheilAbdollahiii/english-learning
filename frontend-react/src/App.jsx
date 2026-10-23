@@ -22,6 +22,7 @@ export default function App() {
   const [storyError, setStoryError] = useState('')
   const [readingLookup, setReadingLookup] = useState(null)
   const [readingLookupBusy, setReadingLookupBusy] = useState(false)
+  const [readingLookupSaving, setReadingLookupSaving] = useState(false)
   const [readingLookupError, setReadingLookupError] = useState('')
   const [readingLookupSaved, setReadingLookupSaved] = useState(false)
   const readingLookupRequestRef = useRef(0)
@@ -580,7 +581,7 @@ export default function App() {
 
   const saveLookupWord = async () => {
     if (!readingLookup?.term || !readingLookup?.data) return
-    setReadingLookupBusy(true)
+    setReadingLookupSaving(true)
     setReadingLookupError('')
     try {
       const res = await apiFetch(apiUrl('/vocabulary/api/my-words/'), {
@@ -603,7 +604,7 @@ export default function App() {
       console.error('Could not save reading lookup:', err)
       setReadingLookupError(t('word_save_failed'))
     } finally {
-      setReadingLookupBusy(false)
+      setReadingLookupSaving(false)
     }
   }
 
@@ -1131,7 +1132,7 @@ export default function App() {
                             <h3 className="mb-2 font-extrabold">{t('reading_useful_phrases')}</h3>
                             <div className="flex flex-wrap gap-2">
                               {readingLookup.data.related_phrases.map((phrase) => (
-                                <button key={phrase.phrase} onClick={() => handleWordClick(phrase.phrase, readingLookup.sentence)} className={`rounded-full border px-3 py-2 text-left text-sm transition hover:border-indigo-500 ${darkMode ? 'border-gray-700 hover:bg-gray-800' : 'border-gray-200 hover:bg-indigo-50'}`}>
+                                <button key={phrase.phrase} disabled={readingLookupBusy || readingLookupSaving} onClick={() => handleWordClick(phrase.phrase, readingLookup.sentence)} className={`rounded-full border px-3 py-2 text-left text-sm transition hover:border-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 ${darkMode ? 'border-gray-700 hover:bg-gray-800' : 'border-gray-200 hover:bg-indigo-50'}`}>
                                   <span className="font-bold" dir="ltr">{phrase.phrase}</span><span className="mx-2 opacity-60">·</span><span dir="rtl">{phrase.translation}</span>
                                 </button>
                               ))}
@@ -1139,7 +1140,7 @@ export default function App() {
                           </section>
                         )}
                         <div className="flex flex-wrap items-center gap-3 border-t border-gray-200/20 pt-4">
-                          {readingLookup.term && <button onClick={saveLookupWord} disabled={readingLookupBusy || readingLookupSaved || !readingLookup.data?.translation} className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-60">{readingLookupSaved ? `✓ ${t('reading_saved')}` : readingLookupBusy ? t('reading_saving') : t('reading_save_word')}</button>}
+                          {readingLookup.term && <button onClick={saveLookupWord} disabled={readingLookupBusy || readingLookupSaving || readingLookupSaved || !readingLookup.data?.translation} className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-60">{readingLookupSaved ? `✓ ${t('reading_saved')}` : readingLookupSaving ? t('reading_saving') : t('reading_save_word')}</button>}
                           <button onClick={closeReadingLookup} className={`rounded-xl border px-5 py-3 text-sm font-bold ${darkMode ? 'border-gray-700 hover:bg-gray-800' : 'border-gray-200 hover:bg-gray-50'}`}>{t('close')}</button>
                         </div>
                       </>
