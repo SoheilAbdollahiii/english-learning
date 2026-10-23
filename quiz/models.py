@@ -7,6 +7,9 @@ class QuizSession(models.Model):
     level = models.CharField(max_length=10, default='B1')
     score = models.IntegerField(default=0)
     total_questions = models.IntegerField(default=0)
+    duration_seconds = models.PositiveIntegerField(default=0)
+    topic_breakdown = models.JSONField(default=dict, blank=True)
+    mistake_patterns = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
