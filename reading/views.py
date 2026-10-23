@@ -97,11 +97,11 @@ def lookup_reading_text(request):
         return Response({"detail": "Both term and sentence must be text."}, status=status.HTTP_400_BAD_REQUEST)
     term = " ".join(term.split()).strip()
     sentence = " ".join(sentence.split()).strip()
-    if not term or len(term) > 100 or not sentence or len(sentence) > 400:
+    if len(term) > 100 or not sentence or len(sentence) > 400:
         return Response(
-            {"detail": "Term must be 1–100 characters and sentence must be 1–400 characters."},
+            {"detail": "Term must be at most 100 characters and sentence must be 1–400 characters."},
             status=status.HTTP_400_BAD_REQUEST,
         )
-    if not any(character.isalpha() for character in term) or not any(character.isalpha() for character in sentence):
+    if (term and not any(character.isalpha() for character in term)) or not any(character.isalpha() for character in sentence):
         return Response({"detail": "Choose English text to look up."}, status=status.HTTP_400_BAD_REQUEST)
     return Response(build_lookup(term, sentence))
