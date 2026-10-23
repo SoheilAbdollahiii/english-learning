@@ -156,6 +156,26 @@ class ContextualReadingLookupTests(TestCase):
         self.assertTrue(any(item["phrase"] == "find out" for item in response.data["related_phrases"]) is False)
         get.assert_called_once()
 
+    def test_lookup_includes_word_learning_details(self):
+        from unittest.mock import Mock, patch
+
+        translated = Mock()
+        translated.ok = True
+        translated.json.return_value = [[["او متوجه شد.", "She noticed it.", None, None]]]
+        with patch("reading.lexicon.requests.get", return_value=translated):
+            response = self.client.post(
+                reverse("reading_lookup"),
+                {"term": "notice", "sentence": "She noticed it."},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["level"], "B1")
+        self.assertTrue(response.data["phonetic"])
+        self.assertIn("observe", response.data["synonyms"])
+        self.assertIn("ignore", response.data["antonyms"])
+        self.assertIn("notice a difference", response.data["collocations"])
+        self.assertTrue(response.data["meanings"])
+
     def test_lookup_supports_common_phrases(self):
         from unittest.mock import Mock, patch
         from django.core.cache import cache
