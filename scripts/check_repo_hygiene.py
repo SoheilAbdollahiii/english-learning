@@ -12,7 +12,7 @@ violations = []
 for name in filter(None, tracked):
     path = PurePosixPath(name)
     parts = path.parts
-    if name == ".env" or (name.startswith(".env.") and name != ".env.example"):
+    if path.name == ".env" or (path.name.startswith(".env.") and path.name != ".env.example"):
         violations.append(f"environment/secret file: {name}")
     if path.name.endswith((".sqlite3", ".db")):
         violations.append(f"local database: {name}")
