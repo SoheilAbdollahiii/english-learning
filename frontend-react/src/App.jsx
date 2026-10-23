@@ -62,6 +62,11 @@ export default function App() {
   const [articles, setArticles] = useState([])
   const [writings, setWritings] = useState([])
   const [personalWords, setPersonalWords] = useState([])
+  const [reviewQueue, setReviewQueue] = useState([])
+  const [dueReviewCount, setDueReviewCount] = useState(0)
+  const [activeReviewWord, setActiveReviewWord] = useState(null)
+  const [reviewAnswerVisible, setReviewAnswerVisible] = useState(false)
+  const [reviewBusy, setReviewBusy] = useState(false)
   const [readingProgress, setReadingProgress] = useState([])
   const [quizHistory, setQuizHistory] = useState([])
   const [quizStats, setQuizStats] = useState({ current_streak: 0, quiz_sessions_total: 0, daily_activity: [] })
@@ -195,7 +200,7 @@ export default function App() {
       setLoading(true)
       try {
         if (activeTab === 'dashboard') {
-          const [wordsRes, personalRes, articlesRes, writingsRes, preferencesRes, progressRes, historyRes, statsRes] = await Promise.all([
+          const [wordsRes, personalRes, articlesRes, writingsRes, preferencesRes, progressRes, historyRes, statsRes, reviewRes] = await Promise.all([
             apiFetch(apiUrl('/vocabulary/api/words/')),
             apiFetch(apiUrl('/vocabulary/api/my-words/')),
             apiFetch(apiUrl('/reading/api/articles/')),
@@ -203,11 +208,12 @@ export default function App() {
             apiFetch(apiUrl('/learning/api/preferences/')),
             apiFetch(apiUrl('/reading/api/progress/')),
             apiFetch(apiUrl('/quiz/api/history/')),
-            apiFetch(apiUrl('/quiz/api/stats/'))
+            apiFetch(apiUrl('/quiz/api/stats/')),
+            apiFetch(apiUrl('/vocabulary/api/review/queue/'))
           ])
-          const [wordsData, personalData, articlesData, writingsData, preferencesData, progressData, historyData, statsData] = await Promise.all([
+          const [wordsData, personalData, articlesData, writingsData, preferencesData, progressData, historyData, statsData, reviewData] = await Promise.all([
             wordsRes.json(), personalRes.json(), articlesRes.json(), writingsRes.json(),
-            preferencesRes.json(), progressRes.json(), historyRes.json(), statsRes.json()
+            preferencesRes.json(), progressRes.json(), historyRes.json(), statsRes.json(), reviewRes.json()
           ])
           setWords(Array.isArray(wordsData) ? wordsData : [])
           setPersonalWords(Array.isArray(personalData) ? personalData : [])
@@ -221,6 +227,8 @@ export default function App() {
           setReadingProgress(Array.isArray(progressData) ? progressData : [])
           setQuizHistory(Array.isArray(historyData) ? historyData : [])
           if (statsRes.ok) setQuizStats(statsData)
+          setReviewQueue(reviewRes.ok && Array.isArray(reviewData.results) ? reviewData.results : [])
+          setDueReviewCount(reviewRes.ok ? Number(reviewData.count) || 0 : 0)
         } else if (activeTab === 'reading') {
           const [articlesRes, progressRes] = await Promise.all([
             apiFetch(apiUrl('/reading/api/articles/')),
@@ -230,13 +238,20 @@ export default function App() {
           setArticles(Array.isArray(articlesData) ? articlesData : [])
           setReadingProgress(Array.isArray(progressData) ? progressData : [])
         } else if (activeTab === 'vocabulary') {
-          const [wordsRes, personalRes] = await Promise.all([
+          const [wordsRes, personalRes, reviewRes] = await Promise.all([
             apiFetch(apiUrl('/vocabulary/api/words/')),
-            apiFetch(apiUrl('/vocabulary/api/my-words/'))
+            apiFetch(apiUrl('/vocabulary/api/my-words/')),
+            apiFetch(apiUrl('/vocabulary/api/review/queue/'))
           ])
-          const [wordsData, personalData] = await Promise.all([wordsRes.json(), personalRes.json()])
+          const [wordsData, personalData, reviewData] = await Promise.all([
+            wordsRes.json(), personalRes.json(), reviewRes.json()
+          ])
           setWords(Array.isArray(wordsData) ? wordsData : [])
           setPersonalWords(Array.isArray(personalData) ? personalData : [])
+          setReviewQueue(reviewRes.ok && Array.isArray(reviewData.results) ? reviewData.results : [])
+          setDueReviewCount(reviewRes.ok ? Number(reviewData.count) || 0 : 0)
+          setActiveReviewWord(null)
+          setReviewAnswerVisible(false)
         } else if (activeTab === 'writing') {
           const res = await apiFetch(apiUrl('/writing/api/writings/'))
           const data = await res.json()
@@ -335,6 +350,7 @@ export default function App() {
       const data = await res.json()
       if (res.ok) {
         setPersonalWords((current) => [data, ...current.filter((item) => item.id !== data.id)])
+        loadReviewQueue()
         alert(t('word_saved', { word: cleanedWord }))
       } else {
         alert(t('word_save_failed'))
@@ -394,6 +410,7 @@ export default function App() {
       const data = await res.json()
       if (res.ok) {
         setPersonalWords((current) => [data, ...current.filter((item) => item.id !== data.id)])
+        loadReviewQueue()
         alert(t('word_saved', { word: data.english_word }))
       } else {
         alert(t('word_save_failed'))
@@ -404,16 +421,63 @@ export default function App() {
     }
   }
 
-  const practiceWord = async (word) => {
-    if (!word.isPersonal) return
+  const startWordReview = (word) => {
+    if (!word?.id) return
+    setActiveReviewWord(word)
+    setReviewAnswerVisible(false)
+  }
+
+  const loadReviewQueue = async () => {
+    setReviewBusy(true)
     try {
-      const res = await apiFetch(apiUrl(`/vocabulary/api/my-words/${word.id}/practice/`), { method: 'POST' })
+      const res = await apiFetch(apiUrl('/vocabulary/api/review/queue/'))
       const data = await res.json()
-      if (res.ok) {
-        setPersonalWords((current) => current.map((item) => item.id === data.id ? data : item))
+      if (res.ok && Array.isArray(data.results)) {
+        setReviewQueue(data.results)
+        setDueReviewCount(Number(data.count) || 0)
+        return data.results
       }
+      return []
     } catch (err) {
-      console.error('Could not update word mastery:', err)
+      console.error('Could not load due vocabulary reviews:', err)
+      return []
+    } finally {
+      setReviewBusy(false)
+    }
+  }
+
+  const beginDailyReview = async () => {
+    const dueWords = await loadReviewQueue()
+    if (dueWords.length > 0) startWordReview(dueWords[0])
+  }
+
+  const submitWordReview = async (remembered) => {
+    if (!activeReviewWord) return
+    setReviewBusy(true)
+    try {
+      const res = await apiFetch(apiUrl(`/vocabulary/api/my-words/${activeReviewWord.id}/review/`), {
+        method: 'POST',
+        body: JSON.stringify({ remembered })
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(data.detail || t('review_failed'))
+        return
+      }
+
+      setPersonalWords((current) => current.map((item) => item.id === data.id ? data : item))
+      const queueRes = await apiFetch(apiUrl('/vocabulary/api/review/queue/'))
+      const queueData = await queueRes.json()
+      const remaining = queueRes.ok && Array.isArray(queueData.results) ? queueData.results : []
+      setReviewQueue(remaining)
+      setDueReviewCount(queueRes.ok ? Number(queueData.count) || 0 : remaining.length)
+      setActiveReviewWord(remaining[0] || null)
+      setReviewAnswerVisible(false)
+    } catch (err) {
+      console.error('Could not save vocabulary review:', err)
+      alert(t('review_failed'))
+    } finally {
+      setReviewBusy(false)
     }
   }
 
@@ -609,6 +673,14 @@ export default function App() {
                   </div>
                 </div>
 
+                <div className={`p-5 rounded-2xl border flex flex-wrap items-center justify-between gap-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                  <div>
+                    <h3 className="text-lg font-extrabold">{t('spaced_review')}</h3>
+                    <p className={`text-sm mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('due_count', { count: dueReviewCount })}</p>
+                  </div>
+                  <button type="button" onClick={() => changeTab('vocabulary')} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2">{t('open_review')}</button>
+                </div>
+
                 <form onSubmit={savePreferences} className={`p-6 rounded-2xl shadow-sm border space-y-5 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                   <div>
                     <h3 className="text-lg font-bold">{t('learning_preferences')}</h3>
@@ -696,6 +768,40 @@ export default function App() {
 
             {activeTab === 'vocabulary' && (
               <div className="space-y-5">
+                <section className={`p-5 rounded-2xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-extrabold">{t('spaced_review')}</h3>
+                      <p className={`text-sm mt-1 max-w-2xl ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('spaced_review_desc')}</p>
+                    </div>
+                    <span className="text-sm font-bold rounded-full px-3 py-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                      {t('due_count', { count: dueReviewCount })}
+                    </span>
+                  </div>
+                  {activeReviewWord ? (
+                    <div className={`mt-4 p-4 rounded-xl border ${darkMode ? 'border-gray-700 bg-gray-900/40' : 'border-gray-200 bg-gray-50'}`}>
+                      <h4 className="text-2xl font-black mb-3" dir="ltr">{activeReviewWord.english_word}</h4>
+                      {!reviewAnswerVisible ? (
+                        <button type="button" onClick={() => setReviewAnswerVisible(true)} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2">{t('reveal_answer')}</button>
+                      ) : (
+                        <>
+                          <p className="text-indigo-500 font-bold mb-4">{activeReviewWord.translation || t('translation_missing')}</p>
+                          <div className="flex flex-wrap gap-3">
+                            <button type="button" disabled={reviewBusy} onClick={() => submitWordReview(true)} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 disabled:opacity-50">{t('remembered')}</button>
+                            <button type="button" disabled={reviewBusy} onClick={() => submitWordReview(false)} className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2 disabled:opacity-50">{t('forgot')}</button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{dueReviewCount > 0 ? t('due_words_ready') : t('review_complete')}</p>
+                      <button type="button" disabled={reviewBusy} onClick={beginDailyReview} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 disabled:opacity-50">
+                        {dueReviewCount > 0 ? t('start_review') : t('refresh_review_queue')}
+                      </button>
+                    </div>
+                  )}
+                </section>
                 <div className={`grid grid-cols-1 md:grid-cols-[1fr_180px] gap-3 p-4 rounded-2xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                   <input value={vocabQuery} onChange={(event) => setVocabQuery(event.target.value)} placeholder={t('search_words')} className={`w-full rounded-xl border px-4 py-3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`} />
                   <select value={vocabLevel} onChange={(event) => setVocabLevel(event.target.value)} aria-label={t('filter_by_level')} className={`rounded-xl border px-3 py-3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`}>
@@ -733,7 +839,7 @@ export default function App() {
                         
                         {word.isPersonal ? (
                           <div className="flex gap-2">
-                            <button onClick={() => practiceWord(word)} disabled={(word.proficiency || 0) >= 100} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm disabled:opacity-50">{t('practice')}</button>
+                            <button onClick={() => startWordReview(word)} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm">{t('review')}</button>
                             <button onClick={() => deletePersonalWord(word)} aria-label={t('delete_word')} className="px-3 py-2 rounded-xl border border-red-300 text-red-500">{t('delete')}</button>
                           </div>
                         ) : (

@@ -14,7 +14,8 @@ An English-learning application with a Django REST API, a React learning interfa
 ## Stage 3 learning features
 
 - **Responsive learning interface:** Search and level filters for Reading and Vocabulary, plus responsive navigation and the existing Persian/English and light/dark controls.
-- **Personal vocabulary:** Learners can save words from a reading passage or from the curated bank, add their own translation, practice saved words to increase mastery, and delete personal entries. Personal words are isolated by account; they are not added to the shared bank.
+- **Personal vocabulary:** Learners can save words from a reading passage or from the curated bank, add their own translation, review saved words, and delete personal entries. Personal words are isolated by account; they are not added to the shared bank.
+- **Spaced repetition:** Saved words have a private review schedule. Learners reveal the translation, report whether they remembered it, and receive a next-review interval. Correct recall grows the interval (1, 3, 7, then doubling up to 60 days); missed recall schedules a retry in 10 minutes. This is a transparent starter heuristic, not a validated adaptive learning model.
 - **Personal learning plan:** The authenticated learner can save a preferred CEFR level, a daily word target (1–100), and a learning goal (general English, travel, work, or exam preparation).
 - **Reading progress:** Articles can be searched and filtered by level, and read/unread status is persisted per learner.
 - **Skill quizzes:** Separate vocabulary, reading, and grammar quizzes are seeded by a data migration. Results include explanations and are saved to a private per-user history.
@@ -29,7 +30,9 @@ The React login screen supports self-service registration. `POST /api/register/`
 - `GET /vocabulary/api/words/` — curated shared vocabulary (authenticated)
 - `GET|POST /vocabulary/api/my-words/` — list or save the current user's words
 - `PATCH|DELETE /vocabulary/api/my-words/<id>/` — update translation/level/mastery or remove an owned word
-- `POST /vocabulary/api/my-words/<id>/practice/` — increase personal word mastery by 20 points, capped at 100
+- `GET /vocabulary/api/review/queue/` — return the total due count and the next batch of up to 20 personal words
+- `POST /vocabulary/api/my-words/<id>/review/` with `{"remembered": true|false}` — record recall and schedule the next review
+- `POST /vocabulary/api/my-words/<id>/practice/` — backwards-compatible shortcut that records a successful recall
 - `GET /reading/api/articles/?q=<search>&level=A1` — search and filter reading content
 - `GET|POST /reading/api/progress/` — read or update per-user article progress
 - `GET|PATCH /learning/api/preferences/` — retrieve or update personal learning settings
