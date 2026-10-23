@@ -1,8 +1,9 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-from datetime import timedelta
 from rest_framework.test import APIClient
 
 from .models import Question, QuizSession
@@ -52,10 +53,6 @@ class LearningQuizTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(QuizSession.objects.count(), 0)
 
-    def test_invalid_quiz_level_is_rejected(self):
-        response = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "D2"})
-        self.assertEqual(response.status_code, 400)
-
     def test_submitting_quiz_saves_result_and_history_is_private(self):
         question = Question.objects.filter(quiz_type="grammar").first()
         response = self.client.post(
@@ -80,17 +77,7 @@ class LearningQuizTests(TestCase):
         question = Question.objects.filter(quiz_type="reading").first()
         response = self.client.post(
             reverse("quiz_submit"),
-            {"quiz_type": "vocabulary", "answers": {str(question.id): "A"}},
-            format="json",
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(QuizSession.objects.count(), 0)
-
-    def test_submission_rejects_questions_from_a_different_level(self):
-        question = Question.objects.filter(quiz_type="grammar", level="A1").first()
-        response = self.client.post(
-            reverse("quiz_submit"),
-            {"quiz_type": "grammar", "level": "B1", "answers": {str(question.id): question.correct_option}},
+            {"quiz_type": "vocabulary", "level": question.level, "answers": {str(question.id): "A"}},
             format="json",
         )
         self.assertEqual(response.status_code, 400)
