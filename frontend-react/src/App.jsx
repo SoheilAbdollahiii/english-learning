@@ -82,12 +82,15 @@ export default function App() {
   }, [darkMode])
 
   useEffect(() => {
-    if (!quizTimerEnabled || !quizQuestions.length || quizSubmitted || quizTimeExpired) return undefined
-    if (quizTimeLeft <= 0) {
-      setQuizTimeExpired(true)
-      return undefined
-    }
-    const timer = window.setTimeout(() => setQuizTimeLeft((remaining) => Math.max(0, remaining - 1)), 1000)
+    if (!quizTimerEnabled || !quizQuestions.length || quizSubmitted || quizTimeExpired || quizTimeLeft <= 0) return undefined
+    const timer = window.setTimeout(() => {
+      if (quizTimeLeft <= 1) {
+        setQuizTimeLeft(0)
+        setQuizTimeExpired(true)
+      } else {
+        setQuizTimeLeft(quizTimeLeft - 1)
+      }
+    }, 1000)
     return () => window.clearTimeout(timer)
   }, [quizTimerEnabled, quizQuestions.length, quizSubmitted, quizTimeExpired, quizTimeLeft])
 
