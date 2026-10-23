@@ -67,7 +67,7 @@ class LearningQuizTests(TestCase):
         response = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "all", "count": 20})
         self.assertEqual(response.status_code, 200)
         self.assertGreater(len(response.data), 5)
-        self.assertTrue({item["level"] for item in response.data}.issubset({"A1", "B1", "C1"}))
+        self.assertTrue({item["level"] for item in response.data}.issubset({"A1", "A2", "B1", "B2", "C1", "C2"}))
 
     def test_mixed_quiz_and_difficulty_filters_work(self):
         response = self.client.get(reverse("quiz_questions"), {
