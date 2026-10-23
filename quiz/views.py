@@ -298,17 +298,45 @@ def quiz_performance_analysis(request, session_id=None):
         payload = _session_analysis_payload(session)
         prior_sessions = list(sessions.filter(created_at__lt=session.created_at)[:10])
         # Historical reports use the stored snapshot; comparisons are reconstructed from prior attempts.
-        details = []
-        for topic, stats in (session.topic_breakdown or {}).items():
-            for _ in range(stats.get("attempted", 0)):
-                details.append({
-                    "topic": topic,
-                    "quiz_type": topic,
-                    "is_correct": len(details) < stats.get("correct", 0),
-                })
-        payload["analysis"] = build_performance_analysis(details, session.duration_seconds, prior_sessions)
-        payload["analysis"]["topic_breakdown"] = list((session.topic_breakdown or {}).values())
-        payload["analysis"]["common_mistakes"] = session.mistake_patterns or []
+        breakdown = list((session.topic_breakdown or {}).values())
+        strengths = [
+            {"topic": item["topic"], "accuracy": item["accuracy"], "correct": item["correct"], "attempted": item["attempted"]}
+            for item in breakdown if item.get("accuracy", 0) >= 70
+        ]
+        weaknesses = sorted(
+            [item for item in breakdown if item.get("accuracy", 0) < 70],
+            key=lambda item: (item.get("accuracy", 0), -item.get("attempted", 0), item.get("topic", "")),
+        )
+        previous_average = round(sum(
+            (item.score * 100 / item.total_questions) if item.total_questions else 0
+            for item in prior_sessions
+        ) / len(prior_sessions)) if prior_sessions else None
+        previous_latest = prior_sessions[0] if prior_sessions else None
+        previous_accuracy = (
+            round(previous_latest.score * 100 / previous_latest.total_questions)
+            if previous_latest and previous_latest.total_questions else None
+        )
+        weakest = weaknesses[0] if weaknesses else None
+        payload["analysis"] = {
+            "duration_seconds": session.duration_seconds,
+            "accuracy": payload["percentage"],
+            "topic_breakdown": breakdown,
+            "strengths": strengths,
+            "weaknesses": weaknesses,
+            "common_mistakes": session.mistake_patterns or [],
+            "comparison": {
+                "previous_quiz_accuracy": previous_accuracy,
+                "change_from_previous_percentage_points": payload["percentage"] - previous_accuracy if previous_accuracy is not None else None,
+                "average_previous_accuracy": previous_average,
+                "previous_quiz_count": len(prior_sessions),
+            },
+            "recommended_next_practice": {
+                "topic": weakest["topic"] if weakest else "general",
+                "quiz_type": weakest["topic"] if weakest and weakest["topic"] in QUIZ_TYPES else "mixed",
+                "reason": "This was your lowest-accuracy topic in this quiz." if weakest else "Complete another quiz for a more specific recommendation.",
+                "suggested_question_count": 5,
+            },
+        }
         return Response(payload)
 
     recent = list(sessions[:10])
