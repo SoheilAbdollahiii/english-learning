@@ -1821,8 +1821,8 @@ function InteractiveText({ text, onWordClick, onSentenceClick, darkMode }) {
     <div className={`space-y-3 leading-relaxed text-justify font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} dir="ltr">
       {sentences.map((sentence, sentenceIndex) => (
         <p key={sentenceIndex} className="group">
-          {sentence.match(/\\s+|[^\\s]+/g)?.map((token, tokenIndex) => {
-            if (/^\\s+$/.test(token)) return <span key={tokenIndex}>{token}</span>
+          {sentence.match(/\s+|[^\s]+/g)?.map((token, tokenIndex) => {
+            if (/^\s+$/.test(token)) return <span key={tokenIndex}>{token}</span>
             const cleanWord = token.replace(/^[^a-zA-Z'-]+|[^a-zA-Z'-]+$/g, '')
             if (!cleanWord) return <span key={tokenIndex}>{token}</span>
             return (
