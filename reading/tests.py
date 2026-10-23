@@ -288,3 +288,29 @@ class ContextualReadingLookupTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["sentence_translation"], "او نور را دید.")
         self.assertTrue(response.data["translation_available"])
+
+
+    def test_unknown_phrasal_verb_gets_translation_when_dictionary_has_no_entry(self):
+        from unittest.mock import Mock, patch
+        from django.core.cache import cache
+
+        cache.clear()
+        dictionary_response = Mock(ok=False)
+        phrase_translation = Mock(ok=True)
+        phrase_translation.json.return_value = [[["رد کردن؛ نپذیرفتن", "turn down", None, None]]]
+        sentence_translation = Mock(ok=True)
+        sentence_translation.json.return_value = [[["او پیشنهاد را رد کرد.", "She turned down the offer.", None, None]]]
+        with patch(
+            "reading.lexicon.requests.get",
+            side_effect=[dictionary_response, phrase_translation, sentence_translation],
+        ):
+            response = self.client.post(
+                reverse("reading_lookup"),
+                {"term": "turn down", "sentence": "She turned down the offer."},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["term_type"], "phrase")
+        self.assertEqual(response.data["translation"], "رد کردن؛ نپذیرفتن")
+        self.assertEqual(response.data["sentence_translation"], "او پیشنهاد را رد کرد.")
