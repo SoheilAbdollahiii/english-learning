@@ -775,7 +775,7 @@ export default function App() {
                       <p className={`text-sm mt-1 max-w-2xl ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('spaced_review_desc')}</p>
                     </div>
                     <span className="text-sm font-bold rounded-full px-3 py-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                      {t('due_count', { count: reviewQueue.length })}
+                      {t('due_count', { count: dueReviewCount })}
                     </span>
                   </div>
                   {activeReviewWord ? (
