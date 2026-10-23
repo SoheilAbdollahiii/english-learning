@@ -103,6 +103,7 @@ const resources = {
       quiz_adaptive_feedback: "Next: {{difficulty}} questions{{topic}}",
       quiz_general_topic: " in a related topic",
       quiz_adaptive_answer_first: "Answer this question to unlock the next one.",
+      quiz_adaptive_mixed_unavailable: "Adaptive mode is available for one skill at a time. Choose Grammar, Vocabulary, or Reading.",
       start_quiz: "Start quiz",
       incorrect: "Not quite",
       quiz_feedback_failed: "Could not check this answer. Please try again.",
@@ -283,6 +284,7 @@ const resources = {
       quiz_adaptive_feedback: "سؤال بعدی: {{difficulty}}{{topic}}",
       quiz_general_topic: " از مبحث مرتبط",
       quiz_adaptive_answer_first: "برای باز شدن سؤال بعدی، ابتدا به این سؤال پاسخ بده.",
+      quiz_adaptive_mixed_unavailable: "حالت تطبیقی برای هر بار یک مهارت است. گرامر، واژگان یا درک مطلب را انتخاب کنید."
       start_quiz: "شروع آزمون",
       incorrect: "پاسخ درست نیست",
       quiz_feedback_failed: "بررسی پاسخ انجام نشد. لطفاً دوباره تلاش کنید.",

@@ -323,6 +323,18 @@ class LearningQuizTests(TestCase):
         response = self.client.get(reverse("adaptive_quiz_next"), {"skill": "mixed"})
         self.assertEqual(response.status_code, 400)
 
+    def test_adaptive_next_question_uses_the_updated_difficulty(self):
+        from .models import AdaptiveQuizProgress
+        question = Question.objects.filter(quiz_type="grammar", level="A1", difficulty="medium").first()
+        self.assertIsNotNone(question)
+        progress = AdaptiveQuizProgress.objects.create(
+            user=self.learner, skill="grammar", current_difficulty="hard"
+        )
+        response = self.client.get(reverse("adaptive_quiz_next"), {"skill": "grammar", "level": "A1"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["question"]["difficulty"], "hard")
+        self.assertEqual(response.data["progress"]["current_difficulty"], progress.current_difficulty)
+
 
     def test_question_difficulty_is_varied_within_each_cefr_skill_group(self):
         for skill in ("vocabulary", "reading", "grammar"):

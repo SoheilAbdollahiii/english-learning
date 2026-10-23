@@ -9,7 +9,7 @@ def classify_question_topics(apps, schema_editor):
         "grammar": [
             ("conditionals", ("if ", "unless", "would have", "had been")),
             ("verb_tenses", ("yesterday", "since ", "for two years", "already", "while ", "last week", "tomorrow")),
-            ("articles", (" a ", " an ", " the ")),
+            ("articles", ("article", "a/an", "a or an", "the correct article")),
             ("prepositions", ("in the morning", "at the", "on the", "between", "under", "behind", "into")),
             ("modals", ("must ", "should ", "might ", "could ", "have to")),
             ("passive_voice", ("was built", "is made", "were written", "been done")),

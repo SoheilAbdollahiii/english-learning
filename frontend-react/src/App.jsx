@@ -1019,7 +1019,7 @@ export default function App() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
                       <label className="space-y-2 text-sm font-semibold">
                         <span>{t('quiz_type_setting')}</span>
-                        <select value={quizType} onChange={(event) => setQuizType(event.target.value)} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                        <select value={quizType} onChange={(event) => { setQuizType(event.target.value); if (event.target.value === 'mixed') setQuizAdaptiveMode(false) }} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
                           {['vocabulary', 'reading', 'grammar', 'mixed'].map((type) => <option key={type} value={type}>{t(`quiz_${type}`)}</option>)}
                         </select>
                       </label>
@@ -1091,7 +1091,7 @@ export default function App() {
                       {t('quiz_shuffle_setting')}
                     </label>
                     <label className={`inline-flex items-start gap-3 rounded-xl border px-4 py-3 text-sm font-semibold ${darkMode ? 'border-indigo-800 bg-indigo-950/30 text-gray-200' : 'border-indigo-200 bg-indigo-50 text-gray-700'}`}>
-                      <input type="checkbox" checked={quizAdaptiveMode} onChange={(event) => setQuizAdaptiveMode(event.target.checked)} disabled={loadingQuiz} className="mt-0.5 h-4 w-4 accent-indigo-600" />
+                      <input type="checkbox" checked={quizAdaptiveMode} onChange={(event) => setQuizAdaptiveMode(event.target.checked)} disabled={loadingQuiz || quizType === 'mixed'} className="mt-0.5 h-4 w-4 accent-indigo-600" />
                       <span className="space-y-1">
                         <span className="block">{t('quiz_adaptive_mode')}</span>
                         <span className="block text-xs font-normal opacity-80">{t('quiz_adaptive_desc')}</span>
@@ -1143,7 +1143,7 @@ export default function App() {
                         <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-300" style={{ width: `${((currentQuestionIndex + 1) / (quizAdaptiveMode ? quizTargetCount : quizQuestions.length)) * 100}%` }} />
                       </div>
                       <p className={`mt-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        {t('quiz_answered_count', { answered: Object.keys(quizAnswers).length, total: quizQuestions.length })}
+                        {t('quiz_answered_count', { answered: Object.keys(quizAnswers).length, total: quizAdaptiveMode ? quizTargetCount : quizQuestions.length })}
                       </p>
                     </div>
 
@@ -1184,7 +1184,7 @@ export default function App() {
                         {quizAdaptiveMode && quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].adaptive_progress && (
                           <p className="pt-1 font-semibold">{t('quiz_adaptive_feedback', {
                             difficulty: t(`difficulty_${quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].recommended_next_difficulty}`),
-                            topic: quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].recommended_topic || t('quiz_general_topic'),
+                            topic: quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].recommended_topic ? ` · ${quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].recommended_topic.replaceAll('_', ' ')}` : ` ${t('quiz_general_topic')}`,
                           })}</p>
                         )}
                       </div>

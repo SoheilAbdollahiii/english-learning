@@ -347,7 +347,7 @@ def get_adaptive_quiz_question(request):
     return Response({
         "question": QuestionSerializer(question).data,
         "progress": _adaptive_progress_payload(progress),
-        "is_topic_practice": needs_topic_practice,
+        "is_topic_practice": needs_topic_practice and question.topic == focus_topic,
         "requested_difficulty": preferred_difficulty,
     })
 
