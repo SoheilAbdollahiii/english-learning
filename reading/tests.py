@@ -263,3 +263,28 @@ class ContextualReadingLookupTests(TestCase):
         self.assertEqual(response.data["term_type"], "sentence")
         self.assertEqual(response.data["sentence_translation"], "امروز هوا خیلی خوب است.")
         get.assert_called_once()
+
+
+    def test_secondary_translation_provider_is_used_when_primary_fails(self):
+        from unittest.mock import Mock, patch
+        from requests import Timeout
+        from django.core.cache import cache
+
+        cache.clear()
+        fallback = Mock(ok=True)
+        fallback.json.return_value = {
+            "responseData": {"translatedText": "او نور را دید."}
+        }
+        with patch(
+            "reading.lexicon.requests.get",
+            side_effect=[Timeout("primary provider unavailable"), fallback],
+        ):
+            response = self.client.post(
+                reverse("reading_lookup"),
+                {"term": "notice", "sentence": "She noticed the light."},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["sentence_translation"], "او نور را دید.")
+        self.assertTrue(response.data["translation_available"])
