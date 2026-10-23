@@ -3,7 +3,8 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle
+from .throttles import LoginRateThrottle, RegistrationRateThrottle
+from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import RegistrationSerializer
 from django.contrib.auth.decorators import login_required
@@ -24,7 +25,7 @@ def dashboard(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-@throttle_classes([AnonRateThrottle])
+@throttle_classes([RegistrationRateThrottle])
 def register_learner(request):
     """Create a learner account and return JWTs so onboarding can continue immediately."""
     serializer = RegistrationSerializer(data=request.data)
@@ -35,3 +36,8 @@ def register_learner(request):
         {"access": str(refresh.access_token), "refresh": str(refresh)},
         status=status.HTTP_201_CREATED,
     )
+
+
+class ThrottledTokenObtainPairView(TokenObtainPairView):
+    """Limit anonymous password attempts before issuing JWTs."""
+    throttle_classes = [LoginRateThrottle]
