@@ -78,7 +78,19 @@ def my_word_detail(request, word_id):
             return Response({"proficiency": "Enter a value from 0 to 100."}, status=status.HTTP_400_BAD_REQUEST)
         word.proficiency = proficiency
     if "translation" in request.data:
-        word.translation = str(request.data["translation"]).strip()[:100]
+        translation = request.data["translation"]
+        if not isinstance(translation, str):
+            return Response(
+                {"translation": "Enter a text translation."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        translation = translation.strip()
+        if len(translation) > 100:
+            return Response(
+                {"translation": "Translation must be 100 characters or fewer."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        word.translation = translation
     if "level" in request.data:
         level = request.data["level"]
         if not isinstance(level, str) or level not in dict(UserWord.LEVEL_CHOICES):
