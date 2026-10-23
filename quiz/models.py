@@ -62,3 +62,44 @@ class AdaptiveQuizProgress(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.skill} - {self.current_difficulty}"
+
+
+class UserGamification(models.Model):
+    """XP, streak and achievement state owned by a single learner."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="gamification")
+    total_xp = models.PositiveIntegerField(default=0)
+    current_streak = models.PositiveIntegerField(default=0)
+    longest_streak = models.PositiveIntegerField(default=0)
+    last_activity_date = models.DateField(blank=True, null=True)
+    grammar_correct = models.PositiveIntegerField(default=0)
+    vocabulary_correct = models.PositiveIntegerField(default=0)
+    badges = models.JSONField(default=list, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.total_xp} XP"
+
+
+class DailyChallengeAttempt(models.Model):
+    """One immutable question set and one reward claim per learner per local day."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="daily_challenges")
+    challenge_date = models.DateField()
+    question_ids = models.JSONField(default=list)
+    completed_at = models.DateTimeField(blank=True, null=True)
+    correct_answers = models.PositiveSmallIntegerField(default=0)
+    total_questions = models.PositiveSmallIntegerField(default=10)
+    xp_awarded = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("user", "challenge_date"), name="unique_daily_challenge_per_user_day")
+        ]
+        ordering = ("-challenge_date",)
+
+    @property
+    def is_completed(self):
+        return self.completed_at is not None
+
+    def __str__(self):
+        return f"{self.user.username} - {self.challenge_date}"

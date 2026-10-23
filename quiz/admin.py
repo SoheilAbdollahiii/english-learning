@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Question, QuizSession
+from .models import DailyChallengeAttempt, Question, QuizSession, UserGamification
 
 
 @admin.register(Question)
@@ -18,3 +18,18 @@ class QuizSessionAdmin(admin.ModelAdmin):
     list_display = ("user", "quiz_type", "score", "total_questions", "created_at")
     list_filter = ("quiz_type", "created_at")
     search_fields = ("user__username",)
+
+
+@admin.register(UserGamification)
+class UserGamificationAdmin(admin.ModelAdmin):
+    list_display = ("user", "total_xp", "current_streak", "longest_streak", "last_activity_date")
+    search_fields = ("user__username",)
+    readonly_fields = ("updated_at",)
+
+
+@admin.register(DailyChallengeAttempt)
+class DailyChallengeAttemptAdmin(admin.ModelAdmin):
+    list_display = ("user", "challenge_date", "completed_at", "correct_answers", "total_questions", "xp_awarded")
+    list_filter = ("challenge_date", "completed_at")
+    search_fields = ("user__username",)
+    readonly_fields = ("created_at",)
