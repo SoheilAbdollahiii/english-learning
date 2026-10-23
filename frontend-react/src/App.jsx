@@ -70,7 +70,10 @@ async function apiFetch(url, options = {}) {
 
 export default function App() {
   const { t, i18n } = useTranslation()
-  const [activeTab, setActiveTab] = useState('dashboard')
+  const [activeTab, setActiveTab] = useState(() => {
+    const requestedTab = new URLSearchParams(window.location.search).get('tab')
+    return ['dashboard', 'reading', 'vocabulary', 'writing', 'quiz'].includes(requestedTab) ? requestedTab : 'dashboard'
+  })
   const [words, setWords] = useState([])
   const [articles, setArticles] = useState([])
   const [writings, setWritings] = useState([])
