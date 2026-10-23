@@ -126,3 +126,89 @@ class InteractiveStoryTests(TestCase):
             endpoint, {"story_id": "forest-signal", "node_id": "ending-rescue", "option_index": 0}, format="json"
         )
         self.assertEqual(missing_question.status_code, 404)
+
+
+class ContextualReadingLookupTests(TestCase):
+    def setUp(self):
+        self.learner = User.objects.create_user(username="lookup-reader", password="Strong-test-pass-123")
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.learner)
+
+    def test_lookup_returns_contextual_word_meaning_phrase_hints_and_sentence_translation(self):
+        from unittest.mock import Mock, patch
+        from django.core.cache import cache
+
+        cache.clear()
+        translated = Mock()
+        translated.ok = True
+        translated.json.return_value = [[["او متوجه نشد که چه اتفاقی افتاده بود.", "He did not notice what had happened.", None, None]]]
+        with patch("reading.lexicon.requests.get", return_value=translated) as get:
+            response = self.client.post(
+                reverse("reading_lookup"),
+                {"term": "notice", "sentence": "He did not notice what had happened."},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["translation"], "متوجه شدن؛ توجه کردن")
+        self.assertIn("aware", response.data["definition"])
+        self.assertEqual(response.data["sentence_translation"], "او متوجه نشد که چه اتفاقی افتاده بود.")
+        self.assertTrue(response.data["translation_available"])
+        self.assertTrue(any(item["phrase"] == "find out" for item in response.data["related_phrases"]) is False)
+        get.assert_called_once()
+
+    def test_lookup_supports_common_phrases(self):
+        from unittest.mock import Mock, patch
+        from django.core.cache import cache
+
+        cache.clear()
+        translated = Mock()
+        translated.ok = True
+        translated.json.return_value = [[["باید بفهمم.", "I need to find out.", None, None]]]
+        with patch("reading.lexicon.requests.get", return_value=translated):
+            response = self.client.post(
+                reverse("reading_lookup"),
+                {"term": "find out", "sentence": "I need to find out."},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["term_type"], "phrase")
+        self.assertEqual(response.data["translation"], "فهمیدن؛ پی بردن")
+
+    def test_lookup_rejects_missing_or_oversized_text(self):
+        endpoint = reverse("reading_lookup")
+        for payload in (
+            {"term": "", "sentence": "A valid sentence."},
+            {"term": "word", "sentence": ""},
+            {"term": "word", "sentence": "x" * 401},
+            {"term": "x" * 101, "sentence": "A valid sentence."},
+            {"term": "123", "sentence": "A valid sentence."},
+        ):
+            with self.subTest(payload=payload):
+                response = self.client.post(endpoint, payload, format="json")
+                self.assertEqual(response.status_code, 400)
+
+    def test_lookup_requires_authentication(self):
+        client = APIClient()
+        response = client.post(
+            reverse("reading_lookup"),
+            {"term": "notice", "sentence": "She noticed the light."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_lookup_gracefully_handles_translation_provider_failure(self):
+        from unittest.mock import patch
+        from requests import Timeout
+        from django.core.cache import cache
+
+        cache.clear()
+        with patch("reading.lexicon.requests.get", side_effect=Timeout("provider timed out")):
+            response = self.client.post(
+                reverse("reading_lookup"),
+                {"term": "notice", "sentence": "She noticed the light."},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["translation"], "متوجه شدن؛ توجه کردن")
+        self.assertFalse(response.data["translation_available"])
+        self.assertEqual(response.data["sentence_translation"], "")
