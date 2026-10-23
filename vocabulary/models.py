@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class Word(models.Model):
@@ -25,6 +26,12 @@ class UserWord(models.Model):
     translation = models.CharField(max_length=100, blank=True, default="")
     level = models.CharField(max_length=2, choices=LEVEL_CHOICES, default="B1")
     proficiency = models.PositiveSmallIntegerField(default=0)
+    next_review_at = models.DateTimeField(default=timezone.now)
+    last_reviewed_at = models.DateTimeField(blank=True, null=True)
+    review_interval_days = models.PositiveSmallIntegerField(default=0)
+    review_count = models.PositiveIntegerField(default=0)
+    correct_count = models.PositiveIntegerField(default=0)
+    incorrect_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
