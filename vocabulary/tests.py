@@ -116,6 +116,48 @@ class PersonalVocabularyTests(TestCase):
         word.refresh_from_db()
         self.assertGreater(word.next_review_at, timezone.now() + timedelta(minutes=9))
 
+    def test_review_quality_hard_uses_short_interval_and_small_mastery_gain(self):
+        word = UserWord.objects.create(
+            user=self.learner,
+            english_word="challenging",
+            proficiency=50,
+            review_interval_days=14,
+        )
+        response = self.client.post(
+            reverse("review_word", args=[word.id]), {"quality": "hard"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["proficiency"], 53)
+        self.assertEqual(response.data["correct_count"], 1)
+        self.assertEqual(response.data["review_interval_days"], 3)
+        word.refresh_from_db()
+        self.assertGreater(word.next_review_at, timezone.now() + timedelta(days=2, hours=23))
+
+    def test_review_quality_forgot_schedules_retry_and_reduces_mastery(self):
+        word = UserWord.objects.create(
+            user=self.learner,
+            english_word="forgotten",
+            proficiency=20,
+            review_interval_days=7,
+        )
+        response = self.client.post(
+            reverse("review_word", args=[word.id]), {"quality": "forgot"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["proficiency"], 15)
+        self.assertEqual(response.data["incorrect_count"], 1)
+        self.assertEqual(response.data["review_interval_days"], 0)
+        word.refresh_from_db()
+        self.assertGreater(word.next_review_at, timezone.now() + timedelta(minutes=9))
+
+    def test_review_rejects_unknown_quality(self):
+        word = UserWord.objects.create(user=self.learner, english_word="invalid-quality")
+        response = self.client.post(
+            reverse("review_word", args=[word.id]), {"quality": "maybe"}, format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(UserWord.objects.get(id=word.id).review_count, 0)
+
     def test_review_rejects_non_boolean_answer_and_other_users_word(self):
         word = UserWord.objects.create(user=self.other, english_word="private")
         response = self.client.post(
