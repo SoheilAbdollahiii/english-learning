@@ -14,7 +14,7 @@ from .serializers import QuestionSerializer
 
 QUIZ_TYPES = {"vocabulary", "reading", "grammar"}
 QUIZ_TYPE_FILTERS = QUIZ_TYPES | {"mixed"}
-QUIZ_LEVELS = {"A1", "B1", "C1"}
+QUIZ_LEVELS = {"A1", "A2", "B1", "B2", "C1", "C2"}
 QUIZ_LEVEL_FILTERS = QUIZ_LEVELS | {"all"}
 QUIZ_DIFFICULTIES = {"easy", "medium", "hard"}
 QUIZ_DIFFICULTY_FILTERS = QUIZ_DIFFICULTIES | {"all"}
@@ -35,7 +35,7 @@ def get_quiz_questions(request):
 
     level = normalize_level(request.query_params.get("level", "B1"))
     if level not in QUIZ_LEVEL_FILTERS:
-        return Response({"detail": "Choose level A1, B1, C1, or all."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"detail": "Choose level A1, A2, B1, B2, C1, C2, or all."}, status=status.HTTP_400_BAD_REQUEST)
 
     difficulty = request.query_params.get("difficulty", "all").strip().lower()
     if difficulty not in QUIZ_DIFFICULTY_FILTERS:
