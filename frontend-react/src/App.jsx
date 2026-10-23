@@ -345,6 +345,7 @@ export default function App() {
       const data = await res.json()
       if (res.ok) {
         setPersonalWords((current) => [data, ...current.filter((item) => item.id !== data.id)])
+        loadReviewQueue()
         alert(t('word_saved', { word: cleanedWord }))
       } else {
         alert(t('word_save_failed'))
@@ -404,6 +405,7 @@ export default function App() {
       const data = await res.json()
       if (res.ok) {
         setPersonalWords((current) => [data, ...current.filter((item) => item.id !== data.id)])
+        loadReviewQueue()
         alert(t('word_saved', { word: data.english_word }))
       } else {
         alert(t('word_save_failed'))
