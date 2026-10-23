@@ -35,6 +35,18 @@ class CorrectWritingTests(SimpleTestCase):
         self.assertIn("Use past simple for completed past actions.", request["messages"][1]["content"])
         self.assertEqual(request["model"], "test-model")
 
+    @patch("rag.services.retrieve_grammar_rule", return_value="Past simple rule")
+    @patch("rag.services.Groq")
+    @override_settings(GROQ_API_KEY="test-key", GROQ_MODEL="test-model")
+    def test_rejects_fractional_score(self, groq_cls, _retrieve):
+        message = MagicMock()
+        message.content = '{"corrected_text":"I went home.","feedback":"Use past simple.","score":91.5}'
+        groq_cls.return_value.chat.completions.create.return_value.choices = [
+            MagicMock(message=message)
+        ]
+        with self.assertRaises(CorrectionUnavailable):
+            correct_writing("I go home yesterday.")
+
     @override_settings(GROQ_API_KEY="")
     def test_requires_api_key(self):
         with self.assertRaises(CorrectionUnavailable):
