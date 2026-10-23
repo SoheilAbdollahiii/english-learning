@@ -344,6 +344,7 @@ export default function App() {
     setQuizAnswers((current) => ({ ...current, [questionId]: optionKey }))
     setQuizError('')
     if (quizAdaptiveMode || quizAnswerMode === 'each') {
+      setLoadingQuiz(true)
       try {
         const response = await apiFetch(apiUrl('/quiz/api/check-answer/'), {
           method: 'POST',
@@ -359,6 +360,8 @@ export default function App() {
       } catch (error) {
         console.error('Could not check quiz answer:', error)
         setQuizError(t('quiz_feedback_failed'))
+      } finally {
+        setLoadingQuiz(false)
       }
     }
   }
