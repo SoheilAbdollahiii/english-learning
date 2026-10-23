@@ -4,7 +4,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 
 // Set VITE_API_BASE_URL when the frontend and API are deployed on different origins.
 // In production, an empty base uses same-origin routes; local development targets Django.
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '')).replace(/\/$/, '')
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? apiUrl('') : '')).replace(/\/$/, '')
 const apiUrl = (path) => `${API_BASE}${path}`
 
 function calculateCurrentStreak(sessions = []) {
@@ -38,7 +38,7 @@ async function apiFetch(url, options = {}) {
     const refreshToken = localStorage.getItem('refresh_token');
     if (refreshToken) {
       try {
-        const refreshRes = await fetch('http://127.0.0.1:8000/api/token/refresh/', {
+        const refreshRes = await fetch(apiUrl('/api/token/refresh/'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refresh: refreshToken })
@@ -132,7 +132,7 @@ export default function App() {
   const handleLogin = async (e) => {
     e.preventDefault()
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/token/', {
+      const res = await fetch(apiUrl('/api/token/'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -177,13 +177,13 @@ export default function App() {
       try {
         if (activeTab === 'dashboard') {
           const [wordsRes, personalRes, articlesRes, writingsRes, preferencesRes, progressRes, historyRes] = await Promise.all([
-            apiFetch('http://127.0.0.1:8000/vocabulary/api/words/'),
-            apiFetch('http://127.0.0.1:8000/vocabulary/api/my-words/'),
-            apiFetch('http://127.0.0.1:8000/reading/api/articles/'),
-            apiFetch('http://127.0.0.1:8000/writing/api/writings/'),
-            apiFetch('http://127.0.0.1:8000/learning/api/preferences/'),
-            apiFetch('http://127.0.0.1:8000/reading/api/progress/'),
-            apiFetch('http://127.0.0.1:8000/quiz/api/history/')
+            apiFetch(apiUrl('/vocabulary/api/words/')),
+            apiFetch(apiUrl('/vocabulary/api/my-words/')),
+            apiFetch(apiUrl('/reading/api/articles/')),
+            apiFetch(apiUrl('/writing/api/writings/')),
+            apiFetch(apiUrl('/learning/api/preferences/')),
+            apiFetch(apiUrl('/reading/api/progress/')),
+            apiFetch(apiUrl('/quiz/api/history/'))
           ])
           const [wordsData, personalData, articlesData, writingsData, preferencesData, progressData, historyData] = await Promise.all([
             wordsRes.json(), personalRes.json(), articlesRes.json(), writingsRes.json(),
@@ -202,26 +202,26 @@ export default function App() {
           setQuizHistory(Array.isArray(historyData) ? historyData : [])
         } else if (activeTab === 'reading') {
           const [articlesRes, progressRes] = await Promise.all([
-            apiFetch('http://127.0.0.1:8000/reading/api/articles/'),
-            apiFetch('http://127.0.0.1:8000/reading/api/progress/')
+            apiFetch(apiUrl('/reading/api/articles/')),
+            apiFetch(apiUrl('/reading/api/progress/'))
           ])
           const [articlesData, progressData] = await Promise.all([articlesRes.json(), progressRes.json()])
           setArticles(Array.isArray(articlesData) ? articlesData : [])
           setReadingProgress(Array.isArray(progressData) ? progressData : [])
         } else if (activeTab === 'vocabulary') {
           const [wordsRes, personalRes] = await Promise.all([
-            apiFetch('http://127.0.0.1:8000/vocabulary/api/words/'),
-            apiFetch('http://127.0.0.1:8000/vocabulary/api/my-words/')
+            apiFetch(apiUrl('/vocabulary/api/words/')),
+            apiFetch(apiUrl('/vocabulary/api/my-words/'))
           ])
           const [wordsData, personalData] = await Promise.all([wordsRes.json(), personalRes.json()])
           setWords(Array.isArray(wordsData) ? wordsData : [])
           setPersonalWords(Array.isArray(personalData) ? personalData : [])
         } else if (activeTab === 'writing') {
-          const res = await apiFetch('http://127.0.0.1:8000/writing/api/writings/')
+          const res = await apiFetch(apiUrl('/writing/api/writings/'))
           const data = await res.json()
           setWritings(Array.isArray(data) ? data : [])
         } else if (activeTab === 'quiz') {
-          const res = await apiFetch('http://127.0.0.1:8000/quiz/api/history/')
+          const res = await apiFetch(apiUrl('/quiz/api/history/'))
           const data = await res.json()
           setQuizHistory(Array.isArray(data) ? data : [])
         }
@@ -244,7 +244,7 @@ export default function App() {
     setQuizAnswers({})
 
     try {
-      const res = await apiFetch(`http://127.0.0.1:8000/quiz/api/questions/?type=${type}`)
+      const res = await apiFetch(apiUrl(`/quiz/api/questions/?type=${type}`))
       const data = await res.json()
       if (res.ok) {
         setQuizQuestions(Array.isArray(data) ? data : [])
@@ -274,7 +274,7 @@ export default function App() {
   const submitQuizFinal = async (finalAnswers) => {
     setLoadingQuiz(true);
     try {
-      const res = await apiFetch('http://127.0.0.1:8000/quiz/api/submit/', {
+      const res = await apiFetch(apiUrl('/quiz/api/submit/'), {
         method: 'POST',
         body: JSON.stringify({
           quiz_type: quizType,
@@ -286,7 +286,7 @@ export default function App() {
       if (res.ok) {
         setQuizResult(resultData)
         setQuizSubmitted(true)
-        const historyRes = await apiFetch('http://127.0.0.1:8000/quiz/api/history/')
+        const historyRes = await apiFetch(apiUrl('/quiz/api/history/'))
         const historyData = await historyRes.json()
         setQuizHistory(Array.isArray(historyData) ? historyData : [])
       } else {
@@ -303,7 +303,7 @@ export default function App() {
     const cleanedWord = word.replace(/^[^a-zA-Z'-]+|[^a-zA-Z'-]+$/g, '').toLowerCase()
     if (!cleanedWord) return
     try {
-      const res = await apiFetch('http://127.0.0.1:8000/vocabulary/api/my-words/', {
+      const res = await apiFetch(apiUrl('/vocabulary/api/my-words/'), {
         method: 'POST',
         body: JSON.stringify({ english_word: cleanedWord, level: preferences.preferred_level || 'B1' })
       })
@@ -324,7 +324,7 @@ export default function App() {
     event.preventDefault()
     setPreferencesSaving(true)
     try {
-      const res = await apiFetch('http://127.0.0.1:8000/learning/api/preferences/', {
+      const res = await apiFetch(apiUrl('/learning/api/preferences/'), {
         method: 'PATCH',
         body: JSON.stringify(preferences)
       })
@@ -347,7 +347,7 @@ export default function App() {
 
   const markArticleRead = async (articleId, completed) => {
     try {
-      const res = await apiFetch('http://127.0.0.1:8000/reading/api/progress/', {
+      const res = await apiFetch(apiUrl('/reading/api/progress/'), {
         method: 'POST',
         body: JSON.stringify({ article_id: articleId, completed })
       })
@@ -362,7 +362,7 @@ export default function App() {
 
   const saveCuratedWord = async (word) => {
     try {
-      const res = await apiFetch('http://127.0.0.1:8000/vocabulary/api/my-words/', {
+      const res = await apiFetch(apiUrl('/vocabulary/api/my-words/'), {
         method: 'POST',
         body: JSON.stringify({ english_word: word.english_word, translation: word.translation || '', level: word.level || preferences.preferred_level || 'B1' })
       })
@@ -382,7 +382,7 @@ export default function App() {
   const practiceWord = async (word) => {
     if (!word.isPersonal) return
     try {
-      const res = await apiFetch(`http://127.0.0.1:8000/vocabulary/api/my-words/${word.id}/practice/`, { method: 'POST' })
+      const res = await apiFetch(apiUrl(`/vocabulary/api/my-words/${word.id}/practice/`), { method: 'POST' })
       const data = await res.json()
       if (res.ok) {
         setPersonalWords((current) => current.map((item) => item.id === data.id ? data : item))
@@ -394,7 +394,7 @@ export default function App() {
 
   const updateWordTranslation = async (word, translation) => {
     try {
-      const res = await apiFetch(`http://127.0.0.1:8000/vocabulary/api/my-words/${word.id}/`, {
+      const res = await apiFetch(apiUrl(`/vocabulary/api/my-words/${word.id}/`), {
         method: 'PATCH',
         body: JSON.stringify({ translation })
       })
@@ -407,7 +407,7 @@ export default function App() {
 
   const deletePersonalWord = async (word) => {
     try {
-      const res = await apiFetch(`http://127.0.0.1:8000/vocabulary/api/my-words/${word.id}/`, { method: 'DELETE' })
+      const res = await apiFetch(apiUrl(`/vocabulary/api/my-words/${word.id}/`), { method: 'DELETE' })
       if (res.ok) setPersonalWords((current) => current.filter((item) => item.id !== word.id))
     } catch (err) {
       console.error('Could not delete saved word:', err)
@@ -438,7 +438,7 @@ export default function App() {
 
     setSubmittingWriting(true);
     try {
-      const res = await apiFetch('http://127.0.0.1:8000/writing/api/writings/', {
+      const res = await apiFetch(apiUrl('/writing/api/writings/'), {
         method: 'POST',
         body: JSON.stringify({ original_text: writingText })
       });
