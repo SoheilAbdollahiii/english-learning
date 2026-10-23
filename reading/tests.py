@@ -211,3 +211,55 @@ class ContextualReadingLookupTests(TestCase):
         self.assertEqual(response.data["translation"], "متوجه شدن؛ توجه کردن")
         self.assertFalse(response.data["translation_available"])
         self.assertEqual(response.data["sentence_translation"], "")
+
+
+    def test_uncurated_dictionary_words_get_a_persian_translation(self):
+        from unittest.mock import Mock, patch
+        from django.core.cache import cache
+
+        cache.clear()
+        dictionary_response = Mock(ok=True)
+        dictionary_response.json.return_value = [{
+            "meanings": [{
+                "partOfSpeech": "verb",
+                "definitions": [{"definition": "to postpone", "example": "They put off the meeting."}],
+            }],
+        }]
+        word_translation = Mock(ok=True)
+        word_translation.json.return_value = [[["به تعویق انداختن", "put off", None, None]]]
+        sentence_translation = Mock(ok=True)
+        sentence_translation.json.return_value = [[["آن‌ها جلسه را عقب انداختند.", "They put off the meeting.", None, None]]]
+        with patch(
+            "reading.lexicon.requests.get",
+            side_effect=[dictionary_response, word_translation, sentence_translation],
+        ):
+            response = self.client.post(
+                reverse("reading_lookup"),
+                {"term": "put off", "sentence": "They put off the meeting."},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["translation"], "به تعویق انداختن")
+        self.assertEqual(response.data["sentence_translation"], "آن‌ها جلسه را عقب انداختند.")
+        self.assertEqual(response.data["term_type"], "phrase")
+
+    def test_sentence_only_lookup_does_not_select_a_word(self):
+        from unittest.mock import Mock, patch
+        from django.core.cache import cache
+
+        cache.clear()
+        translated = Mock(ok=True)
+        translated.json.return_value = [[["امروز هوا خیلی خوب است.", "The weather is very nice today.", None, None]]]
+        with patch("reading.lexicon.requests.get", return_value=translated) as get:
+            response = self.client.post(
+                reverse("reading_lookup"),
+                {"term": "", "sentence": "The weather is very nice today."},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["term"], "")
+        self.assertEqual(response.data["term_type"], "sentence")
+        self.assertEqual(response.data["sentence_translation"], "امروز هوا خیلی خوب است.")
+        get.assert_called_once()
