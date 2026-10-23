@@ -120,8 +120,18 @@ class LearningQuizTests(TestCase):
         self.assertEqual({item["quiz_type"] for item in response.data["details"]}, {"vocabulary", "grammar"})
         self.assertEqual(QuizSession.objects.get(user=self.learner).quiz_type, "mixed")
 
+    def test_new_cefr_levels_have_questions_for_each_skill(self):
+        for quiz_type in ("vocabulary", "reading", "grammar"):
+            for level in ("A2", "B2", "C2"):
+                response = self.client.get(reverse("quiz_questions"), {
+                    "type": quiz_type, "level": level, "count": 30,
+                })
+                self.assertEqual(response.status_code, 200, f"Missing {quiz_type} content at {level}")
+                self.assertEqual(len(response.data), 8)
+                self.assertTrue(all(item["level"] == level for item in response.data))
+
     def test_invalid_cefr_level_is_rejected(self):
-        response = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "A2"})
+        response = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "D1"})
         self.assertEqual(response.status_code, 400)
 
     def test_questions_from_another_level_cannot_be_submitted(self):
