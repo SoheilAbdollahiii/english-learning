@@ -137,18 +137,19 @@ def _translate_to_persian(text):
 
 
 def lookup_reading_text(term, sentence):
-    entry = _dictionary_entry(term)
+    entry = _dictionary_entry(term) if term else {}
+    sentence_translation = _translate_to_persian(sentence)
     return {
         "term": term,
-        "term_type": entry.get("term_type", "word"),
+        "term_type": entry.get("term_type", "sentence" if not term else "word"),
         "translation": entry.get("translation", ""),
         "definition": entry.get("definition", ""),
         "part_of_speech": entry.get("part_of_speech", ""),
         "example": entry.get("example", ""),
         "example_translation": entry.get("example_translation", ""),
         "sentence": sentence,
-        "sentence_translation": _translate_to_persian(sentence),
-        "translation_available": bool(_translate_to_persian(sentence)),
+        "sentence_translation": sentence_translation,
+        "translation_available": bool(sentence_translation),
         "related_phrases": [
             {"phrase": phrase, **details}
             for phrase, details in PHRASES.items()
