@@ -749,6 +749,40 @@ export default function App() {
 
             {activeTab === 'vocabulary' && (
               <div className="space-y-5">
+                <section className={`p-5 rounded-2xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-extrabold">{t('spaced_review')}</h3>
+                      <p className={`text-sm mt-1 max-w-2xl ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('spaced_review_desc')}</p>
+                    </div>
+                    <span className="text-sm font-bold rounded-full px-3 py-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                      {t('due_count', { count: reviewQueue.length })}
+                    </span>
+                  </div>
+                  {activeReviewWord ? (
+                    <div className={`mt-4 p-4 rounded-xl border ${darkMode ? 'border-gray-700 bg-gray-900/40' : 'border-gray-200 bg-gray-50'}`}>
+                      <h4 className="text-2xl font-black mb-3" dir="ltr">{activeReviewWord.english_word}</h4>
+                      {!reviewAnswerVisible ? (
+                        <button type="button" onClick={() => setReviewAnswerVisible(true)} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2">{t('reveal_answer')}</button>
+                      ) : (
+                        <>
+                          <p className="text-indigo-500 font-bold mb-4">{activeReviewWord.translation || t('translation_missing')}</p>
+                          <div className="flex flex-wrap gap-3">
+                            <button type="button" disabled={reviewBusy} onClick={() => submitWordReview(true)} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 disabled:opacity-50">{t('remembered')}</button>
+                            <button type="button" disabled={reviewBusy} onClick={() => submitWordReview(false)} className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2 disabled:opacity-50">{t('forgot')}</button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{reviewQueue.length ? t('due_words_ready') : t('review_complete')}</p>
+                      <button type="button" disabled={reviewBusy} onClick={beginDailyReview} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 disabled:opacity-50">
+                        {reviewQueue.length ? t('start_review') : t('refresh_review_queue')}
+                      </button>
+                    </div>
+                  )}
+                </section>
                 <div className={`grid grid-cols-1 md:grid-cols-[1fr_180px] gap-3 p-4 rounded-2xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                   <input value={vocabQuery} onChange={(event) => setVocabQuery(event.target.value)} placeholder={t('search_words')} className={`w-full rounded-xl border px-4 py-3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`} />
                   <select value={vocabLevel} onChange={(event) => setVocabLevel(event.target.value)} aria-label={t('filter_by_level')} className={`rounded-xl border px-3 py-3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`}>
@@ -786,7 +820,7 @@ export default function App() {
                         
                         {word.isPersonal ? (
                           <div className="flex gap-2">
-                            <button onClick={() => practiceWord(word)} disabled={(word.proficiency || 0) >= 100} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm disabled:opacity-50">{t('practice')}</button>
+                            <button onClick={() => startWordReview(word)} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm">{t('review')}</button>
                             <button onClick={() => deletePersonalWord(word)} aria-label={t('delete_word')} className="px-3 py-2 rounded-xl border border-red-300 text-red-500">{t('delete')}</button>
                           </div>
                         ) : (
