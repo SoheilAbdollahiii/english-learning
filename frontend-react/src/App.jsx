@@ -617,6 +617,7 @@ export default function App() {
         body: JSON.stringify({
           english_word: readingLookup.term,
           translation: readingLookup.data.translation || '',
+          example: readingLookup.data.example || '',
           level: preferences.preferred_level || 'B1'
         })
       })
@@ -1335,7 +1336,8 @@ export default function App() {
                         <button type="button" onClick={() => setReviewAnswerVisible(true)} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2">{t('reveal_answer')}</button>
                       ) : (
                         <>
-                          <p className="text-indigo-500 font-bold mb-4">{activeReviewWord.translation || t('translation_missing')}</p>
+                          <p className="text-indigo-500 font-bold mb-3">{activeReviewWord.translation || t('translation_missing')}</p>
+                          {activeReviewWord.example ? <p className={`mb-4 rounded-lg border px-3 py-2 text-sm leading-6 ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`} dir="ltr">{activeReviewWord.example}</p> : null}
                           <div className="flex flex-wrap gap-3">
                             <button type="button" disabled={reviewBusy} onClick={() => submitWordReview('easy')} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 disabled:opacity-50">{t('review_easy')}</button>
                             <button type="button" disabled={reviewBusy} onClick={() => submitWordReview('hard')} className="rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2 disabled:opacity-50">{t('review_hard')}</button>
