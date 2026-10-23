@@ -59,8 +59,7 @@ jobs:
         run: python manage.py makemigrations --check --dry-run
 
       - name: Run automated tests
-        run: python manage.py test --verbosity 2
-
+        run: python manage.py test --settings=core.test_settings --verbosity 2
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
