@@ -227,10 +227,6 @@ export default function App() {
           setReadingProgress(Array.isArray(progressData) ? progressData : [])
           setQuizHistory(Array.isArray(historyData) ? historyData : [])
           if (statsRes.ok) setQuizStats(statsData)
-        if (gamificationData.gamification) {
-          setGamification(gamificationData.gamification)
-          setDailyChallengeInfo(gamificationData.daily_challenge || { completed: false, question_count: 10, duration_seconds: 300, xp_awarded: 0 })
-        }
           setDueReviewCount(reviewRes.ok ? Number(reviewData.count) || 0 : 0)
           if (gamificationRes.ok) {
             setGamification(gamificationData.gamification || { total_xp: 0, current_streak: 0, longest_streak: 0, badges: [] })
@@ -472,16 +468,20 @@ export default function App() {
       setQuizTimeExpired(false)
 
       try {
-        const [historyRes, statsRes] = await Promise.all([
+        const [historyRes, statsRes, gamificationRes] = await Promise.all([
           apiFetch(apiUrl('/quiz/api/history/')),
           apiFetch(apiUrl('/quiz/api/stats/')),
           apiFetch(apiUrl('/quiz/api/gamification/')),
         ])
-        const historyData = await historyRes.json()
-        const statsData = await statsRes.json()
-        const gamificationData = await (await apiFetch(apiUrl('/quiz/api/gamification/'))).json()
+        const [historyData, statsData, gamificationData] = await Promise.all([
+          historyRes.json(), statsRes.json(), gamificationRes.json(),
+        ])
         if (historyRes.ok) setQuizHistory(Array.isArray(historyData) ? historyData : [])
         if (statsRes.ok) setQuizStats(statsData)
+        if (gamificationRes.ok && gamificationData.gamification) {
+          setGamification(gamificationData.gamification)
+          setDailyChallengeInfo(gamificationData.daily_challenge || { completed: false, question_count: 10, duration_seconds: 300, xp_awarded: 0 })
+        }
       } catch (refreshError) {
         // The submitted result is already saved; a history refresh failure must not hide it.
         console.error('Quiz was submitted, but refreshing quiz history failed:', refreshError)
@@ -827,6 +827,28 @@ export default function App() {
                     <p className="text-xs text-gray-500 mt-2">{t('words_added_today')}</p>
                   </div>
                 </div>
+
+                <section className={`rounded-2xl border p-6 space-y-5 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-xl font-black">{t('daily_challenge_title')} ✨</h3>
+                      <p className={`mt-1 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('daily_challenge_desc', { count: dailyChallengeInfo.question_count || 10, minutes: Math.round((dailyChallengeInfo.duration_seconds || 300) / 60) })}</p>
+                    </div>
+                    <div className="rounded-xl bg-amber-100 px-4 py-2 text-amber-800 font-black">⭐ {gamification.total_xp} XP</div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className={`rounded-xl p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}><p className="text-xs text-gray-500">{t('daily_streak')}</p><p className="text-2xl font-black">🔥 {gamification.current_streak}</p></div>
+                    <div className={`rounded-xl p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}><p className="text-xs text-gray-500">{t('longest_streak')}</p><p className="text-2xl font-black">{gamification.longest_streak}</p></div>
+                    <div className={`rounded-xl p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}><p className="text-xs text-gray-500">{t('grammar_mastery')}</p><p className="text-2xl font-black">{gamification.grammar_correct}/20</p></div>
+                    <div className={`rounded-xl p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}><p className="text-xs text-gray-500">{t('vocabulary_mastery')}</p><p className="text-2xl font-black">{gamification.vocabulary_correct}/20</p></div>
+                  </div>
+                  {gamification.badges?.length > 0 && <div><h4 className="font-bold mb-2">{t('your_badges')}</h4><div className="flex flex-wrap gap-2">{gamification.badges.map((badge) => <span key={badge.id} title={t(`badge_desc_${badge.id}`)} className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-800">🏅 {t(`badge_${badge.id}`)}</span>)}</div></div>}
+                  {dailyChallengeInfo.completed ? (
+                    <div role="status" className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-bold text-green-800">{t('daily_challenge_complete_today', { xp: dailyChallengeInfo.xp_awarded || 0 })}</div>
+                  ) : (
+                    <button type="button" disabled={dailyChallengeLoading} onClick={startDailyChallenge} className="rounded-xl bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700 disabled:opacity-50">{dailyChallengeLoading ? t('loading') : t('start_daily_challenge')}</button>
+                  )}
+                </section>
 
                 <div className={`p-5 rounded-2xl border flex flex-wrap items-center justify-between gap-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                   <div>
@@ -1273,7 +1295,7 @@ export default function App() {
                     {quizTimeExpired && (
                       <div role="status" className={`rounded-xl border p-4 text-sm ${darkMode ? 'border-amber-800 bg-amber-950/30 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
                         {t('quiz_time_up')}
-                        {Object.keys(quizAnswers).length === 0 && (
+                        {(Object.keys(quizAnswers).length === 0 || (dailyChallengeMode && Object.keys(quizAnswers).length < quizQuestions.length)) && (
                           <button type="button" onClick={() => { setQuizTimerMode('none'); setQuizTimeExpired(false); setQuizTimeLeft(quizTotalDuration); setQuizQuestionTimeLeft(quizPerQuestionDuration); setQuizError('') }} className="mt-3 block font-bold underline">
                             {t('quiz_continue_untimed')}
                           </button>
