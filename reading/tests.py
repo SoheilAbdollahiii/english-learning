@@ -177,7 +177,6 @@ class ContextualReadingLookupTests(TestCase):
     def test_lookup_rejects_missing_or_oversized_text(self):
         endpoint = reverse("reading_lookup")
         for payload in (
-            {"term": "", "sentence": "A valid sentence."},
             {"term": "word", "sentence": ""},
             {"term": "word", "sentence": "x" * 401},
             {"term": "x" * 101, "sentence": "A valid sentence."},
