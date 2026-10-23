@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from .models import Question, QuizSession
+from .models import DailyChallengeAttempt, Question, QuizSession, UserGamification
 
 
 User = get_user_model()
@@ -370,3 +370,86 @@ class LearningQuizTests(TestCase):
                     len(difficulties), 2,
                     f"Adaptive difficulty should vary within {skill}/{level}",
                 )
+
+
+class DailyChallengeGamificationTests(TestCase):
+    def setUp(self):
+        self.learner = User.objects.create_user(username="daily-learner", password="Strong-test-pass-123")
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.learner)
+
+    def test_daily_challenge_is_stable_and_does_not_expose_answers(self):
+        first = self.client.get(reverse("daily_challenge"))
+        second = self.client.get(reverse("daily_challenge"))
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(first.data["date"], timezone.localdate().isoformat())
+        self.assertEqual(first.data["question_count"], 10)
+        self.assertEqual(first.data["duration_seconds"], 300)
+        self.assertEqual(
+            [question["id"] for question in first.data["questions"]],
+            [question["id"] for question in second.data["questions"]],
+        )
+        self.assertEqual(len(first.data["questions"]), 10)
+        self.assertNotIn("correct_option", first.data["questions"][0])
+
+    def test_daily_challenge_awards_server_calculated_xp_and_only_once(self):
+        challenge = self.client.get(reverse("daily_challenge"))
+        self.assertEqual(challenge.status_code, 200)
+        questions = Question.objects.in_bulk([item["id"] for item in challenge.data["questions"]])
+        answers = {str(question_id): questions[question_id].correct_option for question_id in questions}
+
+        result = self.client.post(reverse("submit_daily_challenge"), {"answers": answers}, format="json")
+        self.assertEqual(result.status_code, 201)
+        self.assertEqual(result.data["correct_answers"], 10)
+        self.assertEqual(result.data["total"], 10)
+        self.assertGreaterEqual(result.data["xp_awarded"], 125)
+        self.assertEqual(result.data["gamification"]["total_xp"], result.data["xp_awarded"])
+        self.assertIn("first_challenge", [badge["id"] for badge in result.data["gamification"]["badges"]])
+        self.assertEqual(QuizSession.objects.filter(user=self.learner).count(), 1)
+
+        repeated = self.client.post(reverse("submit_daily_challenge"), {"answers": answers}, format="json")
+        self.assertEqual(repeated.status_code, 200)
+        self.assertTrue(repeated.data["already_completed"])
+        self.assertEqual(repeated.data["gamification"]["total_xp"], result.data["xp_awarded"])
+        self.assertEqual(QuizSession.objects.filter(user=self.learner).count(), 1)
+        attempt = DailyChallengeAttempt.objects.get(user=self.learner)
+        self.assertTrue(attempt.is_completed)
+
+    def test_daily_challenge_rejects_partial_and_foreign_question_answers(self):
+        challenge = self.client.get(reverse("daily_challenge"))
+        first_id = challenge.data["questions"][0]["id"]
+        question = Question.objects.get(id=first_id)
+        partial = self.client.post(
+            reverse("submit_daily_challenge"),
+            {"answers": {str(first_id): question.correct_option}},
+            format="json",
+        )
+        self.assertEqual(partial.status_code, 400)
+        foreign = Question.objects.exclude(id__in=[item["id"] for item in challenge.data["questions"]]).first()
+        if foreign:
+            answers = {
+                str(item["id"]): "A" for item in challenge.data["questions"]
+            }
+            answers[str(foreign.id)] = "A"
+            invalid = self.client.post(reverse("submit_daily_challenge"), {"answers": answers}, format="json")
+            self.assertEqual(invalid.status_code, 400)
+        self.assertFalse(DailyChallengeAttempt.objects.get(user=self.learner).is_completed)
+
+    def test_daily_challenge_increments_streak_from_previous_day(self):
+        profile = UserGamification.objects.create(
+            user=self.learner,
+            total_xp=50,
+            current_streak=3,
+            longest_streak=3,
+            last_activity_date=timezone.localdate() - timedelta(days=1),
+        )
+        challenge = self.client.get(reverse("daily_challenge"))
+        questions = Question.objects.in_bulk([item["id"] for item in challenge.data["questions"]])
+        answers = {str(question_id): questions[question_id].correct_option for question_id in questions}
+        result = self.client.post(reverse("submit_daily_challenge"), {"answers": answers}, format="json")
+        self.assertEqual(result.status_code, 201)
+        profile.refresh_from_db()
+        self.assertEqual(profile.current_streak, 4)
+        self.assertEqual(profile.longest_streak, 4)
+        self.assertEqual(profile.total_xp, 50 + result.data["xp_awarded"])
