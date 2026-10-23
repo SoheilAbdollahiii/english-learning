@@ -10,7 +10,7 @@
             <p class="lead mb-0">Welcome back, {{ user.first_name|default:user.username }}. Pick up where you left off and keep building your English, one sentence at a time.</p>
         </div>
         <div class="col-lg-4 text-lg-end">
-            <a href="{% url 'writing_submit' %}" class="btn btn-light btn-lg">Open writing studio <span aria-hidden="true">→</span></a>
+            <a href="{{ FRONTEND_URL }}" class="btn btn-light btn-lg">Open learning app <span aria-hidden="true">→</span></a>
         </div>
     </div>
 </section>
@@ -22,8 +22,8 @@
                 <span class="soft-pill">01 · WRITE</span><span class="fs-3" aria-hidden="true">✎</span>
             </div>
             <h2 class="h4 fw-bold">Writing studio</h2>
-            <p class="text-secondary">Practice expressing your ideas and keep a private journal of your writing submissions.</p>
-            <div class="mt-auto pt-2"><a href="{% url 'writing_submit' %}" class="btn btn-primary w-100">Start writing</a></div>
+            <p class="text-secondary">Write, get AI-assisted feedback when the provider is configured, and review your private writing history.</p>
+            <div class="mt-auto pt-2"><a href="{{ FRONTEND_URL }}?tab=writing" class="btn btn-primary w-100">Start writing</a></div>
         </article>
     </div>
     <div class="col-md-4">
@@ -32,8 +32,8 @@
                 <span class="soft-pill">02 · VOCABULARY</span><span class="fs-3" aria-hidden="true">Aa</span>
             </div>
             <h2 class="h4 fw-bold">Vocabulary bank</h2>
-            <p class="text-secondary">The project contains {{ word_count }} vocabulary entries. A dedicated learning and progress interface is still being developed.</p>
-            <div class="notice-panel mt-auto">Learning interface not available yet</div>
+            <p class="text-secondary">Browse {{ word_count }} curated vocabulary entries, save personal words, and track mastery.</p>
+            <div class="mt-auto pt-2"><a href="{{ FRONTEND_URL }}?tab=vocabulary" class="btn btn-primary w-100">Open vocabulary</a></div>
         </article>
     </div>
     <div class="col-md-4">
@@ -42,8 +42,8 @@
                 <span class="soft-pill">03 · READING</span><span class="fs-3" aria-hidden="true">▤</span>
             </div>
             <h2 class="h4 fw-bold">Reading practice</h2>
-            <p class="text-secondary">There are {{ article_count }} reading entries in the project. Reading exercises and progress tracking are not available in the interface yet.</p>
-            <div class="notice-panel mt-auto">Learning interface not available yet</div>
+            <p class="text-secondary">Explore {{ article_count }} reading articles, mark your progress, and build comprehension.</p>
+            <div class="mt-auto pt-2"><a href="{{ FRONTEND_URL }}?tab=reading" class="btn btn-primary w-100">Open reading</a></div>
         </article>
     </div>
 </div>
