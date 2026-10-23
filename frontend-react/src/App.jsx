@@ -505,6 +505,8 @@ export default function App() {
 
   const dailyWordsAdded = personalWords.filter((word) => new Date(word.created_at).toDateString() === new Date().toDateString()).length
   const dailyGoalPercent = Math.min(100, Math.round((dailyWordsAdded / Math.max(1, Number(preferences.daily_word_goal) || 1)) * 100))
+  const goalTab = ({ general: 'vocabulary', travel: 'reading', work: 'writing', exam: 'quiz' })[preferences.learning_goal] || 'vocabulary'
+  const goalPromptKey = `writing_prompt_${preferences.learning_goal || 'general'}`
 
   const filteredArticles = articles.filter((article) => {
     const matchesQuery = `${article.title} ${article.content}`.toLowerCase().includes(readingQuery.trim().toLowerCase())
@@ -679,6 +681,15 @@ export default function App() {
                     <p className={`text-sm mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('due_count', { count: dueReviewCount })}</p>
                   </div>
                   <button type="button" onClick={() => changeTab('vocabulary')} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2">{t('open_review')}</button>
+                </div>
+
+                <div className={`p-5 rounded-2xl border flex flex-wrap items-center justify-between gap-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                  <div className="max-w-3xl">
+                    <h3 className="text-lg font-extrabold">{t('personalized_next_step')}</h3>
+                    <p className={`mt-1 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t(`goal_next_${preferences.learning_goal || 'general'}`)}</p>
+                    <p className="mt-2 text-xs font-bold text-indigo-500">{t('preferred_level')}: {preferences.preferred_level}</p>
+                  </div>
+                  <button type="button" onClick={() => changeTab(goalTab)} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2">{t('open_recommended_activity')}</button>
                 </div>
 
                 <form onSubmit={savePreferences} className={`p-6 rounded-2xl shadow-sm border space-y-5 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
@@ -859,6 +870,9 @@ export default function App() {
                   <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
                     {t('writing_prompt')}
                   </h3>
+                  <div className={`rounded-xl p-4 mb-4 border ${darkMode ? 'bg-indigo-950/40 border-indigo-900' : 'bg-indigo-50 border-indigo-100'}`}>
+                    <p className="text-sm font-semibold">{t(goalPromptKey)}</p>
+                  </div>
                   <form onSubmit={handleWritingSubmit} className="space-y-4">
                     <textarea 
                       rows="4" 
