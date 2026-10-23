@@ -1,3 +1,6 @@
+from datetime import timedelta
+
+from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -91,4 +94,67 @@ def practice_word(request, word_id):
         return Response({"detail": "Saved word not found."}, status=status.HTTP_404_NOT_FOUND)
     word.proficiency = min(100, word.proficiency + 20)
     word.save(update_fields=["proficiency", "updated_at"])
+    return Response(UserWordSerializer(word).data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def review_queue(request):
+    """Return up to 20 of the current learner's vocabulary items due for review."""
+    due_words = UserWord.objects.filter(
+        user=request.user,
+        next_review_at__lte=timezone.now(),
+    ).order_by("next_review_at", "english_word")[:20]
+    return Response(UserWordSerializer(due_words, many=True).data)
+
+
+def _record_review(word, remembered):
+    now = timezone.now()
+    word.last_reviewed_at = now
+    word.review_count += 1
+
+    if remembered:
+        word.correct_count += 1
+        interval = word.review_interval_days
+        if interval < 1:
+            interval = 1
+        elif interval < 3:
+            interval = 3
+        elif interval < 7:
+            interval = 7
+        else:
+            interval = min(interval * 2, 60)
+        word.review_interval_days = interval
+        word.next_review_at = now + timedelta(days=interval)
+        word.proficiency = min(100, word.proficiency + 10)
+    else:
+        word.incorrect_count += 1
+        word.review_interval_days = 0
+        word.next_review_at = now + timedelta(minutes=10)
+        word.proficiency = max(0, word.proficiency - 5)
+
+    word.save(update_fields=[
+        "last_reviewed_at", "review_interval_days", "review_count", "correct_count",
+        "incorrect_count", "next_review_at", "proficiency", "updated_at",
+    ])
+    return word
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def review_word(request, word_id):
+    """Record recall quality and schedule the next spaced review."""
+    try:
+        word = UserWord.objects.get(id=word_id, user=request.user)
+    except UserWord.DoesNotExist:
+        return Response({"detail": "Saved word not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    remembered = request.data.get("remembered")
+    if not isinstance(remembered, bool):
+        return Response(
+            {"remembered": "Expected true or false."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    _record_review(word, remembered)
     return Response(UserWordSerializer(word).data)
