@@ -581,6 +581,8 @@ export default function App() {
 
   const saveLookupWord = async () => {
     if (!readingLookup?.term || !readingLookup?.data) return
+    const lookupRequestId = readingLookupRequestRef.current
+    const savingTerm = readingLookup.term
     setReadingLookupSaving(true)
     setReadingLookupError('')
     try {
@@ -594,15 +596,15 @@ export default function App() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setReadingLookupError(data.detail || t('word_save_failed'))
+        if (lookupRequestId === readingLookupRequestRef.current) setReadingLookupError(data.detail || t('word_save_failed'))
         return
       }
       setPersonalWords((current) => [data, ...current.filter((item) => item.id !== data.id)])
-      setReadingLookupSaved(true)
+      if (lookupRequestId === readingLookupRequestRef.current) setReadingLookupSaved(true)
       loadReviewQueue()
     } catch (err) {
-      console.error('Could not save reading lookup:', err)
-      setReadingLookupError(t('word_save_failed'))
+      console.error('Could not save reading lookup:', savingTerm, err)
+      if (lookupRequestId === readingLookupRequestRef.current) setReadingLookupError(t('word_save_failed'))
     } finally {
       setReadingLookupSaving(false)
     }
