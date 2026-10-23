@@ -980,9 +980,12 @@ export default function App() {
                       <label className="space-y-2 text-sm font-semibold">
                         <span>{t('quiz_level_setting')}</span>
                         <select value={quizLevel} onChange={(event) => setQuizLevel(event.target.value)} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
-                          <option value="A1">A1 · Beginner</option>
-                          <option value="B1">B1 · Intermediate</option>
-                          <option value="C1">C1 · Advanced</option>
+                          <option value="A1">A1 · {t('level_beginner')}</option>
+                          <option value="A2">A2 · {t('level_elementary')}</option>
+                          <option value="B1">B1 · {t('level_intermediate')}</option>
+                          <option value="B2">B2 · {t('level_upper_intermediate')}</option>
+                          <option value="C1">C1 · {t('level_advanced')}</option>
+                          <option value="C2">C2 · {t('level_proficient')}</option>
                           <option value="all">{t('all_levels')}</option>
                         </select>
                       </label>
