@@ -1421,7 +1421,7 @@ export default function App() {
                         </div>
                         <div className="rounded-xl bg-white/80 dark:bg-gray-800 p-4 space-y-2">
                           <h5 className="font-bold">📈 {t('comparison_with_previous')}</h5>
-                          {quizResult.analysis.comparison?.previous_quiz_accuracy == null ? (
+                          {(quizResult.analysis.comparison?.previous_quiz_accuracy === null || quizResult.analysis.comparison?.previous_quiz_accuracy === undefined) ? (
                             <p className="text-sm text-gray-500">{t('no_previous_quiz')}</p>
                           ) : (
                             <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
