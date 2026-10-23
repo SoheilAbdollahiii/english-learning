@@ -50,6 +50,8 @@ def submit_quiz(request):
         return Response({"detail": "Choose level A1, B1, or C1."}, status=status.HTTP_400_BAD_REQUEST)
     if not isinstance(answers, dict) or not answers:
         return Response({"answers": "Submit at least one answer."}, status=status.HTTP_400_BAD_REQUEST)
+    if len(answers) > 5:
+        return Response({"answers": "Submit no more than five answers per quiz."}, status=status.HTTP_400_BAD_REQUEST)
 
     question_ids = []
     for question_id in answers:
