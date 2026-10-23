@@ -314,3 +314,36 @@ class ContextualReadingLookupTests(TestCase):
         self.assertEqual(response.data["term_type"], "phrase")
         self.assertEqual(response.data["translation"], "رد کردن؛ نپذیرفتن")
         self.assertEqual(response.data["sentence_translation"], "او پیشنهاد را رد کرد.")
+
+
+    def test_cached_dictionary_entry_retries_when_persian_translation_was_missing(self):
+        from unittest.mock import Mock, patch
+        from django.core.cache import cache
+
+        cache.clear()
+        cache.set(
+            "reading_dictionary_v2:resilient",
+            {
+                "definition": "able to recover quickly",
+                "translation": "",
+                "example": "",
+                "example_translation": "",
+                "term_type": "word",
+                "part_of_speech": "adjective",
+            },
+            60,
+        )
+        word_translation = Mock(ok=True)
+        word_translation.json.return_value = [[["تاب‌آور", "resilient", None, None]]]
+        sentence_translation = Mock(ok=True)
+        sentence_translation.json.return_value = [[["او فردی تاب‌آور است.", "She is resilient.", None, None]]]
+        with patch("reading.lexicon.requests.get", side_effect=[word_translation, sentence_translation]):
+            response = self.client.post(
+                reverse("reading_lookup"),
+                {"term": "resilient", "sentence": "She is resilient."},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["translation"], "تاب‌آور")
+        self.assertEqual(response.data["sentence_translation"], "او فردی تاب‌آور است.")
