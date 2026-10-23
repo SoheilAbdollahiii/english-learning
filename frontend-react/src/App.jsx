@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts'
 
@@ -24,6 +24,7 @@ export default function App() {
   const [readingLookupBusy, setReadingLookupBusy] = useState(false)
   const [readingLookupError, setReadingLookupError] = useState('')
   const [readingLookupSaved, setReadingLookupSaved] = useState(false)
+  const readingLookupRequestRef = useRef(0)
   const [writings, setWritings] = useState([])
   const [personalWords, setPersonalWords] = useState([])
   const [dueReviewCount, setDueReviewCount] = useState(0)
@@ -521,6 +522,7 @@ export default function App() {
     const cleanedTerm = word.replace(/^[^a-zA-Z'-]+|[^a-zA-Z'-]+$/g, '').trim().toLowerCase()
     const cleanedSentence = sentence.trim().slice(0, 400)
     if (!cleanedTerm || !cleanedSentence) return
+    const requestId = ++readingLookupRequestRef.current
     setReadingLookup({ term: cleanedTerm, sentence: cleanedSentence, data: null })
     setReadingLookupBusy(true)
     setReadingLookupError('')
@@ -531,43 +533,48 @@ export default function App() {
         body: JSON.stringify({ term: cleanedTerm, sentence: cleanedSentence })
       })
       const data = await res.json()
+      if (requestId !== readingLookupRequestRef.current) return
       if (!res.ok) {
         setReadingLookupError(data.detail || t('reading_lookup_failed'))
         return
       }
       setReadingLookup((current) => current ? { ...current, data } : current)
     } catch (err) {
+      if (requestId !== readingLookupRequestRef.current) return
       console.error('Could not look up reading text:', err)
       setReadingLookupError(t('reading_lookup_failed'))
     } finally {
-      setReadingLookupBusy(false)
+      if (requestId === readingLookupRequestRef.current) setReadingLookupBusy(false)
     }
   }
 
   const handleSentenceClick = async (sentence) => {
     const cleanedSentence = sentence.trim().slice(0, 400)
-    const firstWord = cleanedSentence.match(/[a-zA-Z'-]+/)?.[0]?.toLowerCase() || ''
-    if (!cleanedSentence || !firstWord) return
-    setReadingLookup({ term: firstWord, sentence: cleanedSentence, data: null })
+    if (!cleanedSentence || !/[a-zA-Z]/.test(cleanedSentence)) return
+    const requestId = ++readingLookupRequestRef.current
+    // Sentence-only mode must not silently select or save its first word.
+    setReadingLookup({ term: '', sentence: cleanedSentence, data: null })
     setReadingLookupBusy(true)
     setReadingLookupError('')
     setReadingLookupSaved(false)
     try {
       const res = await apiFetch(apiUrl('/reading/api/lookup/'), {
         method: 'POST',
-        body: JSON.stringify({ term: firstWord, sentence: cleanedSentence })
+        body: JSON.stringify({ term: '', sentence: cleanedSentence })
       })
       const data = await res.json()
+      if (requestId !== readingLookupRequestRef.current) return
       if (!res.ok) {
         setReadingLookupError(data.detail || t('reading_lookup_failed'))
         return
       }
       setReadingLookup((current) => current ? { ...current, data } : current)
     } catch (err) {
+      if (requestId !== readingLookupRequestRef.current) return
       console.error('Could not translate reading sentence:', err)
       setReadingLookupError(t('reading_lookup_failed'))
     } finally {
-      setReadingLookupBusy(false)
+      if (requestId === readingLookupRequestRef.current) setReadingLookupBusy(false)
     }
   }
 
@@ -1083,8 +1090,8 @@ export default function App() {
                   <header className="flex items-start justify-between gap-4 border-b border-gray-200/20 p-5 sm:p-6">
                     <div>
                       <p className="text-xs font-extrabold uppercase tracking-wider text-indigo-500">{t('reading_lookup_eyebrow')}</p>
-                      <h2 id="reading-lookup-title" className="mt-1 text-2xl font-black" dir="ltr">{readingLookup.term}</h2>
-                      <p className={`mt-1 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{readingLookup.data?.term_type === 'phrase' ? t('reading_phrase') : t('reading_word')}</p>
+                      <h2 id="reading-lookup-title" className="mt-1 text-2xl font-black" dir="ltr">{readingLookup.term || t('reading_sentence_translation')}</h2>
+                      <p className={`mt-1 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{!readingLookup.term ? t('reading_sentence_translation') : readingLookup.data?.term_type === 'phrase' ? t('reading_phrase') : t('reading_word')}</p>
                     </div>
                     <button onClick={closeReadingLookup} aria-label={t('close')} className={`rounded-xl p-2 text-xl ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>×</button>
                   </header>
@@ -1092,17 +1099,19 @@ export default function App() {
                     {readingLookupBusy && !readingLookup.data ? <div className="flex items-center gap-3 py-8 text-sm"><span className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />{t('reading_lookup_loading')}</div> : null}
                     {readingLookup.data && (
                       <>
-                        <section className={`rounded-2xl p-4 ${darkMode ? 'bg-indigo-950/40' : 'bg-indigo-50'}`}>
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-bold uppercase tracking-wide text-indigo-500">{t('reading_meaning_context')}</p>
-                              {readingLookup.data.translation ? <p className="mt-2 text-lg font-extrabold">{readingLookup.data.translation}</p> : null}
-                              <p className="mt-2 text-sm leading-6" dir="ltr">{readingLookup.data.definition}</p>
-                              {readingLookup.data.part_of_speech ? <p className="mt-1 text-xs opacity-70">{readingLookup.data.part_of_speech}</p> : null}
+                        {readingLookup.term && (
+                          <section className={`rounded-2xl p-4 ${darkMode ? 'bg-indigo-950/40' : 'bg-indigo-50'}`}>
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold uppercase tracking-wide text-indigo-500">{t('reading_meaning_context')}</p>
+                                {readingLookup.data.translation ? <p className="mt-2 text-lg font-extrabold">{readingLookup.data.translation}</p> : null}
+                                <p className="mt-2 text-sm leading-6" dir="ltr">{readingLookup.data.definition}</p>
+                                {readingLookup.data.part_of_speech ? <p className="mt-1 text-xs opacity-70">{readingLookup.data.part_of_speech}</p> : null}
+                              </div>
+                              <button onClick={speakLookupTerm} className="flex shrink-0 items-center gap-2 rounded-xl border border-indigo-400/40 px-3 py-2 text-sm font-bold hover:bg-indigo-500/10"><span aria-hidden="true">🔊</span>{t('reading_listen')}</button>
                             </div>
-                            <button onClick={speakLookupTerm} className="flex shrink-0 items-center gap-2 rounded-xl border border-indigo-400/40 px-3 py-2 text-sm font-bold hover:bg-indigo-500/10"><span aria-hidden="true">🔊</span>{t('reading_listen')}</button>
-                          </div>
-                        </section>
+                          </section>
+                        )}
                         <section className="space-y-2">
                           <h3 className="font-extrabold">{t('reading_sentence_translation')}</h3>
                           <p className={`rounded-xl border p-3 text-sm leading-7 ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}`} dir="ltr">{readingLookup.sentence}</p>
@@ -1128,7 +1137,7 @@ export default function App() {
                           </section>
                         )}
                         <div className="flex flex-wrap items-center gap-3 border-t border-gray-200/20 pt-4">
-                          <button onClick={saveLookupWord} disabled={readingLookupBusy || readingLookupSaved} className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-60">{readingLookupSaved ? `✓ ${t('reading_saved')}` : readingLookupBusy ? t('reading_saving') : t('reading_save_word')}</button>
+                          {readingLookup.term && <button onClick={saveLookupWord} disabled={readingLookupBusy || readingLookupSaved} className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-60">{readingLookupSaved ? `✓ ${t('reading_saved')}` : readingLookupBusy ? t('reading_saving') : t('reading_save_word')}</button>}
                           <button onClick={closeReadingLookup} className={`rounded-xl border px-5 py-3 text-sm font-bold ${darkMode ? 'border-gray-700 hover:bg-gray-800' : 'border-gray-200 hover:bg-gray-50'}`}>{t('close')}</button>
                         </div>
                       </>
