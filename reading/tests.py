@@ -17,6 +17,11 @@ class ReadingProgressTests(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(user=self.learner)
 
+    def test_reading_library_has_articles_for_all_levels(self):
+        self.assertGreaterEqual(Article.objects.count(), 15)
+        for level in ("A1", "B1", "C1"):
+            self.assertTrue(Article.objects.filter(level=level).exists(), f"Missing reading level {level}")
+
     def test_articles_can_be_searched_and_filtered_by_level(self):
         Article.objects.create(title="Advanced text", content="A more difficult text.", level="C1")
         response = self.client.get(reverse("api_articles"), {"level": "A1", "q": "habit"})
