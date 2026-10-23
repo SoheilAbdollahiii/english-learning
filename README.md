@@ -18,7 +18,7 @@ An English-learning application with a Django REST API, a React learning interfa
 - **Spaced repetition:** Saved words have a private review schedule. Learners reveal the translation, report whether they remembered it, and receive a next-review interval. Correct recall grows the interval (1, 3, 7, then doubling up to 60 days); missed recall schedules a retry in 10 minutes. This is a transparent starter heuristic, not a validated adaptive learning model.
 - **Personal learning plan:** The authenticated learner can save a preferred CEFR level, a daily word target (1–100), and a learning goal (general English, travel, work, or exam preparation). The goal now changes the dashboard's suggested next activity and the writing prompt in both English and Persian.
 - **Reading progress:** The starter reading library contains 15 articles across A1, B1, and C1. Articles can be searched and filtered by level, and read/unread status is persisted per learner.
-- **Skill quizzes:** Separate vocabulary, reading, and grammar quizzes are seeded by a data migration. Results include explanations and are saved to a private per-user history.
+- **Skill quizzes:** Vocabulary, reading, and grammar quizzes each have five questions at A1, B1, and C1. The learner's preferred CEFR level selects the quiz, submitted answers are checked against that level, and history records both skill and level.
 - **Progress data:** The dashboard chart is based on saved quiz sessions, not a fabricated activity curve.
 
 ### Learner onboarding
