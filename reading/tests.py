@@ -347,3 +347,29 @@ class ContextualReadingLookupTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["translation"], "تاب‌آور")
         self.assertEqual(response.data["sentence_translation"], "او فردی تاب‌آور است.")
+
+
+    def test_malformed_dictionary_payload_falls_back_to_translation(self):
+        from unittest.mock import Mock, patch
+        from django.core.cache import cache
+
+        cache.clear()
+        dictionary_response = Mock(ok=True)
+        dictionary_response.json.return_value = ["unexpected payload"]
+        word_translation = Mock(ok=True)
+        word_translation.json.return_value = [[["پایدار", "durable", None, None]]]
+        sentence_translation = Mock(ok=True)
+        sentence_translation.json.return_value = [[["این ماده بادوام است.", "This material is durable.", None, None]]]
+        with patch(
+            "reading.lexicon.requests.get",
+            side_effect=[dictionary_response, word_translation, sentence_translation],
+        ):
+            response = self.client.post(
+                reverse("reading_lookup"),
+                {"term": "durable", "sentence": "This material is durable."},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["translation"], "پایدار")
+        self.assertEqual(response.data["sentence_translation"], "این ماده بادوام است.")
