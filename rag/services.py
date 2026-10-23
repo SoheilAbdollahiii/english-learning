@@ -56,12 +56,12 @@ def correct_writing(text: str) -> dict:
         if not isinstance(feedback, str) or not feedback.strip():
             raise ValueError("The model response is missing feedback.")
         score_value = payload.get("score")
-        if isinstance(score_value, bool) or not isinstance(score_value, (int, float)):
-            raise ValueError("The model response score must be numeric.")
+        if isinstance(score_value, bool) or not isinstance(score_value, int):
+            raise ValueError("The model response score must be an integer.")
         return {
             "corrected_text": corrected_text.strip(),
             "feedback": feedback.strip(),
-            "score": max(0, min(100, int(score_value))),
+            "score": max(0, min(100, score_value)),
             "grammar_reference": rule,
         }
     except Exception as exc:
