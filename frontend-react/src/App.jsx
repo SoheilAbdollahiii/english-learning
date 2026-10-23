@@ -539,6 +539,19 @@ export default function App() {
         setReadingLookupError(data.detail || t('reading_lookup_failed'))
         return
       }
+      if (!data.sentence_translation) {
+        const browserTranslation = await translateEnglishToPersian(cleanedSentence)
+        if (requestId !== readingLookupRequestRef.current) return
+        if (browserTranslation) {
+          data.sentence_translation = browserTranslation
+          data.translation_available = true
+        }
+      }
+      if (data.term && !data.translation) {
+        const browserWordTranslation = await translateEnglishToPersian(data.term)
+        if (requestId !== readingLookupRequestRef.current) return
+        if (browserWordTranslation) data.translation = browserWordTranslation
+      }
       setReadingLookup((current) => current ? { ...current, data } : current)
     } catch (err) {
       if (requestId !== readingLookupRequestRef.current) return
@@ -568,6 +581,19 @@ export default function App() {
       if (!res.ok) {
         setReadingLookupError(data.detail || t('reading_lookup_failed'))
         return
+      }
+      if (!data.sentence_translation) {
+        const browserTranslation = await translateEnglishToPersian(cleanedSentence)
+        if (requestId !== readingLookupRequestRef.current) return
+        if (browserTranslation) {
+          data.sentence_translation = browserTranslation
+          data.translation_available = true
+        }
+      }
+      if (data.term && !data.translation) {
+        const browserWordTranslation = await translateEnglishToPersian(data.term)
+        if (requestId !== readingLookupRequestRef.current) return
+        if (browserWordTranslation) data.translation = browserWordTranslation
       }
       setReadingLookup((current) => current ? { ...current, data } : current)
     } catch (err) {
@@ -1827,6 +1853,41 @@ export default function App() {
       </main>
     </div>
   )
+}
+
+async function translateEnglishToPersian(text) {
+  const source = String(text || '').trim().slice(0, 400)
+  if (!source) return ''
+  const providers = [
+    async () => {
+      const url = new URL('https://translate.googleapis.com/translate_a/single')
+      url.search = new URLSearchParams({ client: 'gtx', sl: 'en', tl: 'fa', dt: 't', q: source }).toString()
+      const response = await fetch(url.toString())
+      if (!response.ok) return ''
+      const payload = await response.json()
+      const segments = Array.isArray(payload?.[0]) ? payload[0] : []
+      return segments.map((part) => Array.isArray(part) && typeof part[0] === 'string' ? part[0] : '').join('').trim()
+    },
+    async () => {
+      const url = new URL('https://api.mymemory.translated.net/get')
+      url.search = new URLSearchParams({ q: source, langpair: 'en|fa' }).toString()
+      const response = await fetch(url.toString())
+      if (!response.ok) return ''
+      const payload = await response.json()
+      const status = Number(payload?.responseStatus ?? 200)
+      const translated = payload?.responseData?.translatedText
+      return status === 200 && typeof translated === 'string' ? translated.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim() : ''
+    },
+  ]
+  for (const provider of providers) {
+    try {
+      const translated = await provider()
+      if (translated) return translated
+    } catch {
+      // Browser/network/CORS restrictions may block a public provider; try the next one.
+    }
+  }
+  return ''
 }
 
 function InteractiveText({ text, onWordClick, onSentenceClick, darkMode }) {
