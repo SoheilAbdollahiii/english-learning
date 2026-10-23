@@ -1179,8 +1179,14 @@ export default function App() {
                     {(quizAdaptiveMode || quizAnswerMode === 'each') && quizImmediateFeedback[quizQuestions[currentQuestionIndex].id] && (
                       <div role="status" className={`rounded-xl border p-4 text-sm space-y-2 ${quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].is_correct ? (darkMode ? 'border-green-800 bg-green-950/30 text-green-200' : 'border-green-200 bg-green-50 text-green-800') : (darkMode ? 'border-red-800 bg-red-950/30 text-red-200' : 'border-red-200 bg-red-50 text-red-800')}`}>
                         <strong>{quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].is_correct ? t('correct') : t('incorrect')}</strong>
-                        {!quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].is_correct && <p>{t('correct_was', { answer: quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].correct_answer })}</p>}
-                        <p>{t('explanation')}: {quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].explanation}</p>
+                        <p><span className="font-semibold">{t('correct_answer_label')}:</span> {quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].correct_answer} — {quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].correct_answer_text}</p>
+                        <p><span className="font-semibold">{t('explanation')}:</span> {quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].explanation}</p>
+                        <div className="rounded-lg border border-current/15 p-3 space-y-1">
+                          <p className="font-semibold">{t('learning_example')}</p>
+                          <p dir="ltr" className="font-medium">{quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].example_sentence}</p>
+                          <p>{t('translation')}: {quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].example_translation}</p>
+                        </div>
+                        <p><span className="font-semibold">{t('common_mistake')}:</span> {quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].common_mistake}</p>
                         {quizAdaptiveMode && quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].adaptive_progress && (
                           <p className="pt-1 font-semibold">{t('quiz_adaptive_feedback', {
                             difficulty: t(`difficulty_${quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].recommended_next_difficulty}`),
@@ -1298,13 +1304,19 @@ export default function App() {
                             <p className={`text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} dir="ltr">
                               <strong>{t('your_answer')}:</strong> {item.user_answer}{chosenText ? ` — ${chosenText}` : ''}
                             </p>
-                            {!item.is_correct && correctText && (
-                              <p className={`text-xs font-medium ${darkMode ? 'text-green-300' : 'text-green-700'}`} dir="ltr">
-                                <strong>{t('correct')}:</strong> {correctText}
-                              </p>
-                            )}
+                            <p className={`text-xs font-medium ${darkMode ? 'text-green-300' : 'text-green-700'}`} dir="ltr">
+                              <strong>{t('correct_answer_label')}:</strong> {item.correct_answer} — {item.correct_answer_text || correctText}
+                            </p>
                             <p className={`text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                               💡 <span className="font-bold">{t('explanation')}:</span> {item.explanation}
+                            </p>
+                            <div className={`rounded-lg border p-3 space-y-1 ${darkMode ? 'border-gray-700 bg-gray-900/40' : 'border-gray-200 bg-white/70'}`}>
+                              <p className="font-bold">{t('learning_example')}</p>
+                              <p dir="ltr" className="font-medium">{item.example_sentence}</p>
+                              <p>{t('translation')}: {item.example_translation}</p>
+                            </div>
+                            <p className={`text-xs font-medium ${darkMode ? 'text-amber-200' : 'text-amber-800'}`}>
+                              <strong>{t('common_mistake')}:</strong> {item.common_mistake}
                             </p>
                           </div>
                         )
