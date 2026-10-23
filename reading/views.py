@@ -83,3 +83,25 @@ def check_interactive_story_answer(request):
     if not result["valid"]:
         return Response({"detail": result["explanation"]}, status=status.HTTP_400_BAD_REQUEST)
     return Response({"correct": result["correct"], "explanation": result["explanation"]})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def lookup_reading_text(request):
+    """Look up a word or phrase in context and translate its containing sentence."""
+    from .lexicon import lookup_reading_text as build_lookup
+
+    term = request.data.get("term")
+    sentence = request.data.get("sentence")
+    if not isinstance(term, str) or not isinstance(sentence, str):
+        return Response({"detail": "Both term and sentence must be text."}, status=status.HTTP_400_BAD_REQUEST)
+    term = " ".join(term.split()).strip()
+    sentence = " ".join(sentence.split()).strip()
+    if not term or len(term) > 100 or not sentence or len(sentence) > 400:
+        return Response(
+            {"detail": "Term must be 1–100 characters and sentence must be 1–400 characters."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not any(character.isalpha() for character in term) or not any(character.isalpha() for character in sentence):
+        return Response({"detail": "Choose English text to look up."}, status=status.HTTP_400_BAD_REQUEST)
+    return Response(build_lookup(term, sentence))
