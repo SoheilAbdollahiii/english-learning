@@ -98,6 +98,26 @@ class LearningQuizTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(QuizSession.objects.count(), 0)
 
+    def test_question_id_with_leading_zero_does_not_raise_server_error(self):
+        question = Question.objects.filter(quiz_type="grammar", level="A1").first()
+        response = self.client.post(
+            reverse("quiz_submit"),
+            {"quiz_type": "grammar", "level": "A1", "answers": {f"0{question.id}": question.correct_option}},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["total"], 1)
+
+    def test_nonpositive_question_ids_are_rejected(self):
+        for question_id in ("0", "-1"):
+            response = self.client.post(
+                reverse("quiz_submit"),
+                {"quiz_type": "grammar", "level": "A1", "answers": {question_id: "A"}},
+                format="json",
+            )
+            self.assertEqual(response.status_code, 400, question_id)
+            self.assertIn("answers", response.data)
+
     def test_submitting_more_than_five_answers_is_rejected(self):
         questions = Question.objects.filter(quiz_type="grammar", level="A1").order_by("id")[:6]
         self.assertEqual(len(questions), 6)
