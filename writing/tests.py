@@ -61,7 +61,7 @@ class WritingWorkspaceTests(TestCase):
         submission = WritingSubmission.objects.get()
         self.assertEqual(submission.user, self.user)
         self.assertEqual(submission.original_text, "I enjoy learning English.")
-        self.assertEqual(submission.score, 0)
+        self.assertIsNone(submission.score)
         self.assertEqual(submission.corrected_text, "")
         self.assertContains(self.client.get(self.workspace_url), "I enjoy learning English.")
 
@@ -151,7 +151,7 @@ class WritingAPIPermissionsTests(TestCase):
         self.assertEqual(response.status_code, 201)
         submission = WritingSubmission.objects.get()
         self.assertEqual(submission.user, self.user)
-        self.assertEqual(submission.score, 0)
+        self.assertIsNone(submission.score)
         self.assertEqual(submission.corrected_text, "")
         self.assertNotEqual(submission.feedback, "forged feedback")
 

@@ -42,7 +42,7 @@ def _analyze_or_save_draft(text):
                 "AI correction is unavailable. The original draft was saved without "
                 "automated correction; please try again later."
             ),
-            "score": 0,
+            "score": None,
         }
 
 

@@ -6,7 +6,7 @@ class WritingSubmission(models.Model):
     original_text = models.TextField()
     corrected_text = models.TextField(blank=True, null=True)
     feedback = models.TextField(blank=True, null=True)
-    score = models.IntegerField(default=0)
+    score = models.IntegerField(blank=True, null=True, default=None)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
