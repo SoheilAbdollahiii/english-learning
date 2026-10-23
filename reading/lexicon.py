@@ -91,12 +91,15 @@ def _dictionary_entry(term):
         )
         if response.ok:
             payload = response.json()
-            first = payload[0] if isinstance(payload, list) and payload else {}
+            first = payload[0] if isinstance(payload, list) and payload and isinstance(payload[0], dict) else {}
             meanings = first.get("meanings", [])
-            for meaning in meanings:
+            for meaning in meanings if isinstance(meanings, list) else []:
+                if not isinstance(meaning, dict):
+                    continue
                 definitions = meaning.get("definitions", [])
-                if definitions:
-                    definition = definitions[0]
+                for definition in definitions if isinstance(definitions, list) else []:
+                    if not isinstance(definition, dict) or not definition.get("definition"):
+                        continue
                     entry = {
                         "definition": definition.get("definition", ""),
                         "translation": "",
@@ -105,6 +108,8 @@ def _dictionary_entry(term):
                         "term_type": "phrase" if " " in normalized else "word",
                         "part_of_speech": meaning.get("partOfSpeech", ""),
                     }
+                    break
+                if entry:
                     break
     except (requests.RequestException, ValueError, TypeError, IndexError):
         entry = None
