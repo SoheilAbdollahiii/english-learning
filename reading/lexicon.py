@@ -76,6 +76,12 @@ def _dictionary_entry(term):
     cache_key = "reading_dictionary_v2:" + normalized
     cached = cache.get(cache_key)
     if cached:
+        # A temporary translation outage must not poison the dictionary cache
+        # with a permanently empty Persian meaning.
+        if not cached.get("translation"):
+            cached["translation"] = _translate_to_persian(normalized)
+            if cached["translation"]:
+                cache.set(cache_key, cached, 60 * 60 * 24)
         return cached
     entry = None
     try:
