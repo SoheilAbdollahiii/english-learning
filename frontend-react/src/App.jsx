@@ -733,7 +733,9 @@ export default function App() {
   const activeStory = interactiveStories.find((story) => story.id === activeStoryId) || null
   const activeStoryNode = activeStory?.nodes?.[activeStoryNodeId] || null
   const storyProgressPercent = activeStory && storyVisitedNodes.length
-    ? Math.min(100, Math.round((storyVisitedNodes.length / Math.max(1, Object.keys(activeStory.nodes).length)) * 100))
+    ? activeStoryNode?.ending
+      ? 100
+      : Math.min(90, Math.round((storyVisitedNodes.length / 4) * 100))
     : 0
 
   const filteredArticles = articles.filter((article) => {
