@@ -30,6 +30,7 @@
 - Centralized the frontend API transport and JWT refresh helper in `frontend-react/src/api.js`, reducing networking/authentication concerns inside the main React component.
 - Tightened LLM output validation so fractional model scores are rejected rather than silently truncated to an integer; out-of-range integer scores remain clamped to 0–100.
 - Tightened saved-vocabulary translation updates to reject non-string values and text longer than the model's 100-character field instead of coercing or silently truncating input.
+- Represented unavailable writing scores as `NULL` instead of zero, added a data migration to clear misleading scores on uncorrected drafts, and hid the score badge when no score exists.
 - Added regression tests for the new validation rules.
 
 ## Remaining technical debt and launch risks
