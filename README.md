@@ -67,7 +67,7 @@ Run `python manage.py migrate` after pulling the changes so the personal data ta
    ```bash
    python manage.py migrate
    python manage.py check
-   python manage.py test
+   python manage.py test --settings=core.test_settings
    python manage.py runserver
    ```
 
