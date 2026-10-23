@@ -1152,6 +1152,36 @@ export default function App() {
                             </div>
                           </section>
                         )}
+                        {readingLookup.term && (
+                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <section className={`rounded-2xl border p-4 ${darkMode ? 'border-gray-700 bg-gray-800/70' : 'border-gray-200 bg-gray-50'}`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <h3 className="font-extrabold">{t('word_pronunciation')}</h3>
+                                <span className="rounded-full bg-indigo-500/10 px-2 py-1 text-xs font-black text-indigo-500">{readingLookup.data.level || 'B1'}</span>
+                              </div>
+                              <p className="mt-2 text-lg font-semibold" dir="ltr">{readingLookup.data.phonetic || t('pronunciation_hint')}</p>
+                              <p className="mt-1 text-xs opacity-70">{t('word_level_label')}</p>
+                            </section>
+                            <section className={`rounded-2xl border p-4 ${darkMode ? 'border-gray-700 bg-gray-800/70' : 'border-gray-200 bg-gray-50'}`}>
+                              <h3 className="font-extrabold">{t('word_meanings')}</h3>
+                              {(readingLookup.data.meanings || []).length ? (readingLookup.data.meanings || []).slice(0, 4).map((meaning, index) => (
+                                <div key={`${meaning.part_of_speech}-${index}`} className="mt-2 text-sm leading-6">
+                                  {meaning.part_of_speech ? <span className="font-bold text-indigo-500">{meaning.part_of_speech}: </span> : null}
+                                  <span dir="ltr">{meaning.definition}</span>
+                                  {meaning.example ? <p className="mt-1 opacity-75" dir="ltr">“{meaning.example}”</p> : null}
+                                </div>
+                              )) : <p className="mt-2 text-sm opacity-70">{readingLookup.data.definition}</p>}
+                            </section>
+                          </div>
+                        )}
+                        {readingLookup.term && ['synonyms', 'antonyms', 'collocations'].map((key) => {
+                          const items = readingLookup.data[key] || []
+                          if (!items.length) return null
+                          return <section key={key} className="space-y-2">
+                            <h3 className="font-extrabold">{t(key === 'synonyms' ? 'word_synonyms' : key === 'antonyms' ? 'word_antonyms' : 'word_collocations')}</h3>
+                            <div className="flex flex-wrap gap-2">{items.map((item) => <button key={item} type="button" onClick={() => handleWordClick(item, readingLookup.sentence)} className={`rounded-full border px-3 py-2 text-sm font-semibold transition hover:border-indigo-500 ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`} dir="ltr">{item}</button>)}</div>
+                          </section>
+                        })}
                         <section className="space-y-2">
                           <h3 className="font-extrabold">{t('reading_sentence_translation')}</h3>
                           <p className={`rounded-xl border p-3 text-sm leading-7 ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}`} dir="ltr">{readingLookup.sentence}</p>
