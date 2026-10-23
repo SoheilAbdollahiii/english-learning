@@ -620,6 +620,7 @@ export default function App() {
   }
 
   const closeReadingLookup = () => {
+    readingLookupRequestRef.current += 1
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel()
     setReadingLookup(null)
     setReadingLookupError('')
