@@ -121,6 +121,25 @@ class WritingAPIPermissionsTests(TestCase):
         self.assertEqual(submission.corrected_text, "")
         self.assertNotEqual(submission.feedback, "forged feedback")
 
+    @patch("writing.views.correct_writing", return_value={
+        "corrected_text": "She goes to school every day.",
+        "feedback": "Use the third-person singular form 'goes'.",
+        "score": 87,
+        "grammar_reference": "Subject-verb agreement",
+    })
+    @override_settings(GROQ_API_KEY="test-key")
+    def test_api_returns_real_correction_feedback_and_score(self, _correct):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            self.url,
+            {"original_text": "She go to school every day."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["corrected_text"], "She goes to school every day.")
+        self.assertEqual(response.data["feedback"], "Use the third-person singular form 'goes'.")
+        self.assertEqual(response.data["score"], 87)
+
     def test_api_rejects_blank_and_overlong_text(self):
         self.client.force_authenticate(user=self.user)
         blank = self.client.post(self.url, {"original_text": "  "}, format="json")
