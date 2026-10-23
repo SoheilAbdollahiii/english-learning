@@ -1,6 +1,8 @@
 from django.contrib import messages
+from django.core.cache import cache
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated
@@ -13,6 +15,20 @@ from core.throttles import WritingCorrectionThrottle
 
 
 MAX_CHARACTERS = 5000
+MAX_DAILY_WEB_CORRECTIONS = 30
+
+
+def _consume_html_correction_quota(user_id):
+    """Apply a basic per-user daily cap to the legacy session-authenticated form."""
+    key = f"writing-web-corrections:{user_id}:{timezone.localdate().isoformat()}"
+    if cache.add(key, 1, timeout=86400):
+        return True
+    try:
+        count = cache.incr(key)
+    except ValueError:
+        cache.set(key, 1, timeout=86400)
+        return True
+    return count <= MAX_DAILY_WEB_CORRECTIONS
 
 
 def _analyze_or_save_draft(text):
@@ -40,6 +56,8 @@ def writing_submit(request):
             messages.error(request, "Please enter a piece of writing before submitting.")
         elif len(original_text) > MAX_CHARACTERS:
             messages.error(request, "Your writing must be 5,000 characters or fewer.")
+        elif not _consume_html_correction_quota(request.user.pk):
+            messages.error(request, "Daily writing limit reached. Please try again tomorrow.")
         else:
             analysis = _analyze_or_save_draft(original_text)
             submission = WritingSubmission.objects.create(
