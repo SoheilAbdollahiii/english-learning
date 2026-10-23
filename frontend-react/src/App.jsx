@@ -623,6 +623,7 @@ export default function App() {
     readingLookupRequestRef.current += 1
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel()
     setReadingLookup(null)
+    setReadingLookupBusy(false)
     setReadingLookupError('')
     setReadingLookupSaved(false)
   }
