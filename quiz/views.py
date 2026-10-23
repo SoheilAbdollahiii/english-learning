@@ -53,13 +53,19 @@ def submit_quiz(request):
     if len(answers) > 5:
         return Response({"answers": "Submit no more than five answers per quiz."}, status=status.HTTP_400_BAD_REQUEST)
 
-    question_ids = []
-    for question_id in answers:
+    normalized_answers = {}
+    for raw_question_id, answer in answers.items():
         try:
-            question_ids.append(int(question_id))
+            question_id = int(raw_question_id)
         except (TypeError, ValueError):
             return Response({"answers": "Question IDs must be integers."}, status=status.HTTP_400_BAD_REQUEST)
+        if question_id < 1:
+            return Response({"answers": "Question IDs must be positive integers."}, status=status.HTTP_400_BAD_REQUEST)
+        if question_id in normalized_answers:
+            return Response({"answers": "Submit each question only once."}, status=status.HTTP_400_BAD_REQUEST)
+        normalized_answers[question_id] = answer
 
+    question_ids = list(normalized_answers)
     questions = {
         question.id: question
         for question in Question.objects.filter(id__in=question_ids, quiz_type=quiz_type, level=level)
@@ -76,7 +82,7 @@ def submit_quiz(request):
         question = questions.get(question_id)
         if question is None:
             continue
-        user_answer = str(answers[str(question_id)] if str(question_id) in answers else answers[question_id]).upper()
+        user_answer = str(normalized_answers[question_id]).upper()
         if user_answer not in {"A", "B", "C", "D"}:
             return Response({"answers": "Answers must be A, B, C, or D."}, status=status.HTTP_400_BAD_REQUEST)
         is_correct = question.correct_option.upper() == user_answer
