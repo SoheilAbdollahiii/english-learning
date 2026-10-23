@@ -484,7 +484,7 @@ export default function App() {
     <div className={`min-h-screen font-sans transition-colors duration-300 ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`} dir={i18n.language === 'fa' ? 'rtl' : 'ltr'}>
       <nav className={`shadow-sm border-b sticky top-0 z-10 transition-colors duration-300 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-16 items-center">
+            <div className="flex flex-wrap justify-between min-h-16 items-center gap-3 py-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-xl">A</span>
@@ -492,7 +492,7 @@ export default function App() {
                 <span className={`font-extrabold text-xl ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t('app_title')}</span>
               </div>
               
-              <div className="flex gap-3 sm:gap-6">
+              <div className="order-3 flex w-full max-w-full gap-3 overflow-x-auto whitespace-nowrap sm:order-none sm:w-auto sm:gap-6">
                 <button onClick={() => changeTab('dashboard')} className={`px-1 pt-1 border-b-2 text-sm font-bold transition-colors ${activeTab === 'dashboard' ? 'border-indigo-600 text-indigo-500' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
                   {t('tab_dashboard')}
                 </button>
