@@ -12,6 +12,14 @@ export default function App() {
   })
   const [words, setWords] = useState([])
   const [articles, setArticles] = useState([])
+  const [interactiveStories, setInteractiveStories] = useState([])
+  const [activeStoryId, setActiveStoryId] = useState(null)
+  const [activeStoryNodeId, setActiveStoryNodeId] = useState(null)
+  const [storyVisitedNodes, setStoryVisitedNodes] = useState([])
+  const [storySelectedOption, setStorySelectedOption] = useState('')
+  const [storyAnswerFeedback, setStoryAnswerFeedback] = useState(null)
+  const [storyAnswerBusy, setStoryAnswerBusy] = useState(false)
+  const [storyError, setStoryError] = useState('')
   const [writings, setWritings] = useState([])
   const [personalWords, setPersonalWords] = useState([])
   const [dueReviewCount, setDueReviewCount] = useState(0)
@@ -234,13 +242,15 @@ export default function App() {
             setDailyChallengeInfo(gamificationData.daily_challenge || { completed: false, question_count: 10, duration_seconds: 300, xp_awarded: 0 })
           }
         } else if (activeTab === 'reading') {
-          const [articlesRes, progressRes] = await Promise.all([
+          const [articlesRes, progressRes, storiesRes] = await Promise.all([
             apiFetch(apiUrl('/reading/api/articles/')),
-            apiFetch(apiUrl('/reading/api/progress/'))
+            apiFetch(apiUrl('/reading/api/progress/')),
+            apiFetch(apiUrl('/reading/api/stories/'))
           ])
-          const [articlesData, progressData] = await Promise.all([articlesRes.json(), progressRes.json()])
+          const [articlesData, progressData, storiesData] = await Promise.all([articlesRes.json(), progressRes.json(), storiesRes.json()])
           setArticles(Array.isArray(articlesData) ? articlesData : [])
           setReadingProgress(Array.isArray(progressData) ? progressData : [])
+          setInteractiveStories(storiesRes.ok && Array.isArray(storiesData) ? storiesData : [])
         } else if (activeTab === 'vocabulary') {
           const [wordsRes, personalRes, reviewRes] = await Promise.all([
             apiFetch(apiUrl('/vocabulary/api/words/')),
@@ -565,6 +575,56 @@ export default function App() {
     }
   }
 
+  const startInteractiveStory = (story) => {
+    setActiveStoryId(story.id)
+    setActiveStoryNodeId(story.start_node)
+    setStoryVisitedNodes([story.start_node])
+    setStorySelectedOption('')
+    setStoryAnswerFeedback(null)
+    setStoryError('')
+  }
+
+  const resetInteractiveStory = () => {
+    setActiveStoryId(null)
+    setActiveStoryNodeId(null)
+    setStoryVisitedNodes([])
+    setStorySelectedOption('')
+    setStoryAnswerFeedback(null)
+    setStoryError('')
+  }
+
+  const chooseStoryPath = (nextNodeId) => {
+    if (!activeStory?.nodes?.[nextNodeId]) return
+    setActiveStoryNodeId(nextNodeId)
+    setStoryVisitedNodes((current) => current.includes(nextNodeId) ? current : [...current, nextNodeId])
+    setStorySelectedOption('')
+    setStoryAnswerFeedback(null)
+    setStoryError('')
+  }
+
+  const submitStoryAnswer = async () => {
+    if (!activeStory || !activeStoryNodeId || storySelectedOption === '') return
+    setStoryAnswerBusy(true)
+    setStoryError('')
+    try {
+      const response = await apiFetch(apiUrl('/reading/api/stories/check-answer/'), {
+        method: 'POST',
+        body: JSON.stringify({ story_id: activeStory.id, node_id: activeStoryNodeId, option_index: Number(storySelectedOption) })
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        setStoryError(data.detail || t('story_answer_failed'))
+        return
+      }
+      setStoryAnswerFeedback(data)
+    } catch (error) {
+      console.error('Could not check story answer:', error)
+      setStoryError(t('story_answer_failed'))
+    } finally {
+      setStoryAnswerBusy(false)
+    }
+  }
+
   const saveCuratedWord = async (word) => {
     try {
       const res = await apiFetch(apiUrl('/vocabulary/api/my-words/'), {
@@ -669,6 +729,12 @@ export default function App() {
   const dailyGoalPercent = Math.min(100, Math.round((dailyWordsAdded / Math.max(1, Number(preferences.daily_word_goal) || 1)) * 100))
   const goalTab = ({ general: 'vocabulary', travel: 'reading', work: 'writing', exam: 'quiz' })[preferences.learning_goal] || 'vocabulary'
   const goalPromptKey = `writing_prompt_${preferences.learning_goal || 'general'}`
+
+  const activeStory = interactiveStories.find((story) => story.id === activeStoryId) || null
+  const activeStoryNode = activeStory?.nodes?.[activeStoryNodeId] || null
+  const storyProgressPercent = activeStory && storyVisitedNodes.length
+    ? Math.min(100, Math.round((storyVisitedNodes.length / Math.max(1, Object.keys(activeStory.nodes).length)) * 100))
+    : 0
 
   const filteredArticles = articles.filter((article) => {
     const matchesQuery = `${article.title} ${article.content}`.toLowerCase().includes(readingQuery.trim().toLowerCase())
@@ -927,6 +993,96 @@ export default function App() {
 
             {activeTab === 'reading' && (
               <div className="space-y-5">
+                <section className={`overflow-hidden rounded-3xl border shadow-sm ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                  <div className="bg-gradient-to-r from-violet-700 via-indigo-600 to-sky-600 px-6 py-6 text-white sm:px-8">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-100">{t('story_mode_eyebrow')}</p>
+                        <h2 className="mt-2 text-2xl font-black sm:text-3xl">{t('story_mode_title')}</h2>
+                        <p className="mt-2 max-w-2xl text-sm text-indigo-100">{t('story_mode_desc')}</p>
+                      </div>
+                      {activeStory && <button onClick={resetInteractiveStory} className="rounded-xl border border-white/40 px-4 py-2 text-sm font-bold hover:bg-white/10">{t('story_back_to_library')}</button>}
+                    </div>
+                  </div>
+                  {activeStory && activeStoryNode ? (
+                    <div className="space-y-5 p-5 sm:p-8">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-xl font-extrabold">{activeStory.title}</h3>
+                          <p className={`mt-1 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>{activeStory.level} · {t(`story_genre_${activeStory.genre}`)} · {t('story_minutes', { count: activeStory.estimated_minutes })}</p>
+                        </div>
+                        <button onClick={() => startInteractiveStory(activeStory)} className={`rounded-xl border px-3 py-2 text-sm font-bold ${darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'}`}>{t('story_restart')}</button>
+                      </div>
+                      <div>
+                        <div className={`mb-2 flex justify-between text-xs font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}><span>{t('story_progress')}</span><span>{storyProgressPercent}%</span></div>
+                        <div className={`h-2 overflow-hidden rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}><div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${storyProgressPercent}%` }} /></div>
+                      </div>
+                      <article className={`rounded-2xl border p-5 sm:p-6 ${darkMode ? 'border-gray-700 bg-gray-900/50' : 'border-indigo-100 bg-indigo-50/40'}`}>
+                        <InteractiveText text={activeStoryNode.text} onWordClick={handleWordClick} darkMode={darkMode} />
+                      </article>
+                      {activeStoryNode.ending ? (
+                        <div className={`rounded-2xl border p-5 ${darkMode ? 'border-emerald-900 bg-emerald-950/30' : 'border-emerald-200 bg-emerald-50'}`}>
+                          <p className="font-extrabold text-emerald-600">{t('story_the_end')}</p>
+                          <p className={`mt-1 text-sm ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>{t('story_ending_desc')}</p>
+                          <button onClick={resetInteractiveStory} className="mt-4 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-700">{t('story_choose_another')}</button>
+                        </div>
+                      ) : (
+                        <>
+                          {activeStoryNode.question && (
+                            <div className={`rounded-2xl border p-5 ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`}>
+                              <p className="mb-1 text-xs font-bold uppercase tracking-wide text-indigo-500">{t('story_comprehension_check')}</p>
+                              <h4 className="mb-4 text-lg font-extrabold">{activeStoryNode.question.prompt}</h4>
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                {activeStoryNode.question.options.map((option, index) => (
+                                  <button key={option} onClick={() => { setStorySelectedOption(String(index)); setStoryAnswerFeedback(null) }} className={`rounded-xl border p-3 text-left text-sm transition-colors ${storySelectedOption === String(index) ? 'border-indigo-500 bg-indigo-500/10 ring-2 ring-indigo-500/20' : darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'}`} aria-pressed={storySelectedOption === String(index)}>
+                                    <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-xs font-black text-indigo-700">{String.fromCharCode(65 + index)}</span>{option}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="mt-4 flex flex-wrap items-center gap-3">
+                                <button onClick={submitStoryAnswer} disabled={storySelectedOption === '' || storyAnswerBusy} className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50">{storyAnswerBusy ? t('story_checking') : t('story_check_answer')}</button>
+                                {storyAnswerFeedback && (
+                                  <p role="status" className={`text-sm font-semibold ${storyAnswerFeedback.correct ? 'text-emerald-500' : 'text-amber-500'}`}>{storyAnswerFeedback.correct ? t('story_answer_correct') : t('story_answer_incorrect')} {storyAnswerFeedback.explanation}</p>
+                                )}
+                                {storyError && <p role="alert" className="text-sm font-semibold text-red-500">{storyError}</p>}
+                              </div>
+                            </div>
+                          )}
+                          {(!activeStoryNode.question || storyAnswerFeedback?.correct) && activeStoryNode.choices?.length > 0 && (
+                            <div>
+                              <h4 className="mb-3 font-extrabold">{t('story_what_next')}</h4>
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                {activeStoryNode.choices.map((choice) => (
+                                  <button key={choice.next_node} onClick={() => chooseStoryPath(choice.next_node)} className={`rounded-2xl border p-4 text-left font-bold transition hover:-translate-y-0.5 hover:border-indigo-400 ${darkMode ? 'border-gray-700 bg-gray-800 hover:bg-gray-700' : 'border-gray-200 bg-white hover:bg-indigo-50'}`}>
+                                    <span className="mr-2 text-indigo-500">↗</span>{choice.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 sm:p-8">
+                      {interactiveStories.map((story) => (
+                        <article key={story.id} className={`flex flex-col rounded-2xl border p-5 transition hover:-translate-y-1 hover:shadow-lg ${darkMode ? 'border-gray-700 bg-gray-900/50' : 'border-gray-200 bg-white'}`}>
+                          <div className="mb-4 flex items-center justify-between gap-2">
+                            <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-extrabold text-indigo-700">{story.level}</span>
+                            <span className={`text-xs font-semibold ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('story_minutes', { count: story.estimated_minutes })}</span>
+                          </div>
+                          <h3 className="text-lg font-extrabold">{story.title}</h3>
+                          <p className={`mt-2 flex-grow text-sm leading-6 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{story.description}</p>
+                          <div className="mt-4 flex items-center justify-between gap-2">
+                            <span className="rounded-lg bg-violet-100 px-2 py-1 text-xs font-bold text-violet-700">{t(`story_genre_${story.genre}`)}</span>
+                            <button onClick={() => startInteractiveStory(story)} className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700">{t('story_start')}</button>
+                          </div>
+                        </article>
+                      ))}
+                      {interactiveStories.length === 0 && <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('story_loading_empty')}</p>}
+                    </div>
+                  )}
+                </section>
                 <div className={`grid grid-cols-1 md:grid-cols-[1fr_180px] gap-3 p-4 rounded-2xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                   <input value={readingQuery} onChange={(event) => setReadingQuery(event.target.value)} placeholder={t('search_articles')} className={`w-full rounded-xl border px-4 py-3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`} />
                   <select value={readingLevel} onChange={(event) => setReadingLevel(event.target.value)} aria-label={t('filter_by_level')} className={`rounded-xl border px-3 py-3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`}>
