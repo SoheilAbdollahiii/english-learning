@@ -199,7 +199,7 @@ export default function App() {
       setLoading(true)
       try {
         if (activeTab === 'dashboard') {
-          const [wordsRes, personalRes, articlesRes, writingsRes, preferencesRes, progressRes, historyRes, statsRes] = await Promise.all([
+          const [wordsRes, personalRes, articlesRes, writingsRes, preferencesRes, progressRes, historyRes, statsRes, reviewRes] = await Promise.all([
             apiFetch(apiUrl('/vocabulary/api/words/')),
             apiFetch(apiUrl('/vocabulary/api/my-words/')),
             apiFetch(apiUrl('/reading/api/articles/')),
@@ -207,11 +207,12 @@ export default function App() {
             apiFetch(apiUrl('/learning/api/preferences/')),
             apiFetch(apiUrl('/reading/api/progress/')),
             apiFetch(apiUrl('/quiz/api/history/')),
-            apiFetch(apiUrl('/quiz/api/stats/'))
+            apiFetch(apiUrl('/quiz/api/stats/')),
+            apiFetch(apiUrl('/vocabulary/api/review/queue/'))
           ])
-          const [wordsData, personalData, articlesData, writingsData, preferencesData, progressData, historyData, statsData] = await Promise.all([
+          const [wordsData, personalData, articlesData, writingsData, preferencesData, progressData, historyData, statsData, reviewData] = await Promise.all([
             wordsRes.json(), personalRes.json(), articlesRes.json(), writingsRes.json(),
-            preferencesRes.json(), progressRes.json(), historyRes.json(), statsRes.json()
+            preferencesRes.json(), progressRes.json(), historyRes.json(), statsRes.json(), reviewRes.json()
           ])
           setWords(Array.isArray(wordsData) ? wordsData : [])
           setPersonalWords(Array.isArray(personalData) ? personalData : [])
@@ -225,6 +226,7 @@ export default function App() {
           setReadingProgress(Array.isArray(progressData) ? progressData : [])
           setQuizHistory(Array.isArray(historyData) ? historyData : [])
           if (statsRes.ok) setQuizStats(statsData)
+          setReviewQueue(reviewRes.ok && Array.isArray(reviewData) ? reviewData : [])
         } else if (activeTab === 'reading') {
           const [articlesRes, progressRes] = await Promise.all([
             apiFetch(apiUrl('/reading/api/articles/')),
@@ -662,6 +664,14 @@ export default function App() {
                     </div>
                     <p className="text-xs text-gray-500 mt-2">{t('words_added_today')}</p>
                   </div>
+                </div>
+
+                <div className={`p-5 rounded-2xl border flex flex-wrap items-center justify-between gap-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                  <div>
+                    <h3 className="text-lg font-extrabold">{t('spaced_review')}</h3>
+                    <p className={`text-sm mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('due_count', { count: reviewQueue.length })}</p>
+                  </div>
+                  <button type="button" onClick={() => changeTab('vocabulary')} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2">{t('open_review')}</button>
                 </div>
 
                 <form onSubmit={savePreferences} className={`p-6 rounded-2xl shadow-sm border space-y-5 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
