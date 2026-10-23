@@ -149,6 +149,28 @@ def _translate_to_persian(text):
                 return translated
     except (requests.RequestException, ValueError, TypeError, IndexError, KeyError):
         pass
+
+    # Secondary provider keeps translations available when Google's public endpoint
+    # is blocked or rate-limited. Keep the same strict timeout and fail gracefully.
+    try:
+        response = requests.get(
+            "https://api.mymemory.translated.net/get",
+            params={"q": text[:500], "langpair": "en|fa"},
+            headers={"User-Agent": "EnglishLearningStudio/1.0"},
+            timeout=3.5,
+        )
+        if response.ok:
+            payload = response.json()
+            result = payload.get("responseData", {}) if isinstance(payload, dict) else {}
+            translated = result.get("translatedText", "") if isinstance(result, dict) else ""
+            if isinstance(translated, str) and translated.strip():
+                from html import unescape
+
+                translated = unescape(translated).strip()
+                cache.set(cache_key, translated, 60 * 60 * 12)
+                return translated
+    except (requests.RequestException, ValueError, TypeError, IndexError, KeyError):
+        pass
     return ""
 
 
