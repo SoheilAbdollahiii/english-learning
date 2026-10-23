@@ -102,6 +102,9 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('access_token'))
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('')
+  const [passwordConfirm, setPasswordConfirm] = useState('')
+  const [isRegistering, setIsRegistering] = useState(false)
 
   const streak = useMemo(() => calculateCurrentStreak(quizHistory), [quizHistory])
   const chartData = useMemo(() => {
@@ -149,6 +152,34 @@ export default function App() {
     } catch (err) {
       console.error('Login failed', err)
       alert(t('login_failed'))
+    }
+  }
+
+  const handleRegister = async (e) => {
+    e.preventDefault()
+    if (password !== passwordConfirm) {
+      alert(t('password_mismatch'))
+      return
+    }
+    try {
+      const res = await fetch(apiUrl('/api/register/'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password, password_confirm: passwordConfirm })
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        const details = Object.values(data || {}).flat().filter((value) => typeof value === 'string')
+        alert(details[0] || t('registration_failed'))
+        return
+      }
+      localStorage.setItem('access_token', data.access)
+      localStorage.setItem('refresh_token', data.refresh)
+      setLoading(true)
+      setIsLoggedIn(true)
+    } catch (err) {
+      console.error('Registration failed', err)
+      alert(t('registration_failed'))
     }
   }
 
@@ -467,17 +498,22 @@ export default function App() {
             <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mb-4">
               <span className="text-white font-bold text-2xl">A</span>
             </div>
-            <h2 className={`text-2xl font-extrabold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t('login')}</h2>
+            <h2 className={`text-2xl font-extrabold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{isRegistering ? t('create_account') : t('login')}</h2>
           </div>
-          <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+          <form className="mt-8 space-y-6" onSubmit={isRegistering ? handleRegister : handleLogin}>
             <div className="space-y-4">
-              <input type="text" required value={username} onChange={(e) => setUsername(e.target.value)} className={`appearance-none rounded-xl block w-full px-4 py-3 border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-200 text-gray-900 placeholder-gray-400'}`} placeholder={t('username')} />
-              <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className={`appearance-none rounded-xl block w-full px-4 py-3 border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-200 text-gray-900 placeholder-gray-400'}`} placeholder={t('password')} />
+              <input type="text" required autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} className={`appearance-none rounded-xl block w-full px-4 py-3 border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-200 text-gray-900 placeholder-gray-400'}`} placeholder={t('username')} />
+              {isRegistering && <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className={`appearance-none rounded-xl block w-full px-4 py-3 border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-200 text-gray-900 placeholder-gray-400'}`} placeholder={t('email_optional')} />}
+              <input type="password" required autoComplete={isRegistering ? 'new-password' : 'current-password'} value={password} onChange={(e) => setPassword(e.target.value)} className={`appearance-none rounded-xl block w-full px-4 py-3 border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-200 text-gray-900 placeholder-gray-400'}`} placeholder={t('password')} />
+              {isRegistering && <input type="password" required autoComplete="new-password" value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)} className={`appearance-none rounded-xl block w-full px-4 py-3 border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-200 text-gray-900 placeholder-gray-400'}`} placeholder={t('password_confirm')} />}
             </div>
             <button type="submit" className="w-full flex justify-center py-3 px-4 border border-transparent font-bold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 transition-colors">
-              {t('login')}
+              {isRegistering ? t('register') : t('login')}
             </button>
           </form>
+          <button type="button" onClick={() => setIsRegistering((current) => !current)} className="w-full text-sm font-bold text-indigo-600 hover:text-indigo-800">
+            {isRegistering ? t('already_have_account') : t('no_account')}
+          </button>
           <div className="flex gap-2 pt-4">
             <button onClick={toggleLanguage} title={t('language_toggle')} aria-label={t('language_toggle')} className="flex-1 text-sm font-bold text-gray-500 hover:text-indigo-600 transition-colors">
               {i18n.language === 'en' ? '🇮🇷 فارسی' : '🇬🇧 English'}
