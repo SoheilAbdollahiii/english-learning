@@ -16,6 +16,7 @@ urlpatterns = [
     path('reading/', include('reading.urls')),
     
     # JWT احراز هویت
+    path('api/register/', views.register_learner, name='register_learner'),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('quiz/', include('quiz.urls')),
