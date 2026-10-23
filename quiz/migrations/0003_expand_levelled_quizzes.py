@@ -42,16 +42,23 @@ QUESTIONS = [
 
 def seed_questions(apps, schema_editor):
     Question = apps.get_model("quiz", "Question")
-    for quiz_type, text, a, b, c, d, correct, explanation, level in QUESTIONS:
+    letters = ("A", "B", "C", "D")
+    for index, (quiz_type, text, a, b, c, d, correct, explanation, level) in enumerate(QUESTIONS):
+        # Rotate answer positions deterministically so new question sets do not teach
+        # learners to guess a particular letter. Keep the answer key aligned.
+        options = [a, b, c, d]
+        shift = index % len(options)
+        options = options[shift:] + options[:shift]
+        correct_index = (letters.index(correct) - shift) % len(letters)
         Question.objects.get_or_create(
             quiz_type=quiz_type,
             question_text=text,
             defaults={
-                "option_a": a,
-                "option_b": b,
-                "option_c": c,
-                "option_d": d,
-                "correct_option": correct,
+                "option_a": options[0],
+                "option_b": options[1],
+                "option_c": options[2],
+                "option_d": options[3],
+                "correct_option": letters[correct_index],
                 "explanation": explanation,
                 "level": level,
             },
