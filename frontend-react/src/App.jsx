@@ -42,6 +42,7 @@ export default function App() {
   const [quizAnswers, setQuizAnswers] = useState({})
   const [quizSubmitted, setQuizSubmitted] = useState(false)
   const [quizResult, setQuizResult] = useState(null)
+  const [quizStartedAt, setQuizStartedAt] = useState(null)
   const [loadingQuiz, setLoadingQuiz] = useState(false)
   const [quizType, setQuizType] = useState('vocabulary')
   const [quizLevel, setQuizLevel] = useState('B1')
@@ -299,6 +300,7 @@ export default function App() {
         changeTab('quiz')
         return
       }
+      setQuizStartedAt(Date.now() - ((data.elapsed_seconds || 0) * 1000))
       setDailyChallengeMode(true)
       setQuizType('mixed')
       setQuizLevel('all')
@@ -352,6 +354,7 @@ export default function App() {
   }
 
   const startQuiz = async (type = 'vocabulary') => {
+    setQuizStartedAt(Date.now())
     setDailyChallengeMode(false)
     setQuizType(type)
     const level = quizLevel || preferences.preferred_level || 'B1'
@@ -449,7 +452,12 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify(dailyChallengeMode
           ? { answers: finalAnswers }
-          : { quiz_type: quizType, level: quizLevel, answers: finalAnswers }),
+          : {
+              quiz_type: quizType,
+              level: quizLevel,
+              answers: finalAnswers,
+              duration_seconds: quizStartedAt ? Math.max(0, Math.floor((Date.now() - quizStartedAt) / 1000)) : 0,
+            }),
       })
       const resultData = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -1379,6 +1387,57 @@ export default function App() {
                         </div>
                       </div>
                     </div>
+
+                    {quizResult.analysis && (
+                      <section className={`rounded-2xl border p-5 sm:p-6 space-y-5 ${darkMode ? 'bg-gray-900/40 border-gray-700' : 'bg-indigo-50/70 border-indigo-100'}`} aria-labelledby="performance-analysis-title">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <h4 id="performance-analysis-title" className="text-lg font-black">{t('performance_analysis_title')}</h4>
+                            <p className={`mt-1 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('performance_analysis_subtitle')}</p>
+                          </div>
+                          <div className="rounded-xl bg-white/80 dark:bg-gray-800 px-4 py-2 text-sm font-bold">
+                            ⏱ {t('time_spent')}: {Math.floor((quizResult.analysis.duration_seconds || 0) / 60)}:{String((quizResult.analysis.duration_seconds || 0) % 60).padStart(2, '0')}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="rounded-xl bg-white/80 dark:bg-gray-800 p-4">
+                            <h5 className="font-bold mb-3">💪 {t('performance_strengths')}</h5>
+                            {quizResult.analysis.strengths?.length ? (
+                              <ul className="space-y-2">{quizResult.analysis.strengths.map((item) => <li key={item.topic} className="flex justify-between gap-3 text-sm"><span>{item.topic}</span><strong className="text-green-600 dark:text-green-400">{item.accuracy}%</strong></li>)}</ul>
+                            ) : <p className="text-sm text-gray-500">{t('no_clear_strengths')}</p>}
+                          </div>
+                          <div className="rounded-xl bg-white/80 dark:bg-gray-800 p-4">
+                            <h5 className="font-bold mb-3">🎯 {t('performance_weaknesses')}</h5>
+                            {quizResult.analysis.weaknesses?.length ? (
+                              <ul className="space-y-2">{quizResult.analysis.weaknesses.map((item) => <li key={item.topic} className="flex justify-between gap-3 text-sm"><span>{item.topic}</span><strong className="text-rose-600 dark:text-rose-400">{item.accuracy}%</strong></li>)}</ul>
+                            ) : <p className="text-sm text-gray-500">{t('no_clear_weaknesses')}</p>}
+                          </div>
+                        </div>
+                        <div className="rounded-xl bg-white/80 dark:bg-gray-800 p-4 space-y-3">
+                          <h5 className="font-bold">🔎 {t('common_mistakes_title')}</h5>
+                          {quizResult.analysis.common_mistakes?.length ? (
+                            <ul className="space-y-3">{quizResult.analysis.common_mistakes.map((item, index) => <li key={`${item.topic}-${index}`} className="text-sm"><div className="flex justify-between gap-3"><span>{item.mistake}</span><span className="shrink-0 rounded-full bg-rose-100 dark:bg-rose-950 px-2 py-0.5 font-bold">{t('mistake_count', { count: item.count })}</span></div><p className="mt-1 text-xs text-gray-500">{t('topic_label')}: {item.topic}</p></li>)}</ul>
+                          ) : <p className="text-sm text-gray-500">{t('no_common_mistakes')}</p>}
+                        </div>
+                        <div className="rounded-xl bg-white/80 dark:bg-gray-800 p-4 space-y-2">
+                          <h5 className="font-bold">📈 {t('comparison_with_previous')}</h5>
+                          {quizResult.analysis.comparison?.previous_quiz_accuracy == null ? (
+                            <p className="text-sm text-gray-500">{t('no_previous_quiz')}</p>
+                          ) : (
+                            <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+                              <span>{t('previous_quiz_accuracy')}: <strong>{quizResult.analysis.comparison.previous_quiz_accuracy}%</strong></span>
+                              <span>{t('change_from_previous')}: <strong className={(quizResult.analysis.comparison.change_from_previous_percentage_points || 0) >= 0 ? 'text-green-600' : 'text-rose-600'}>{(quizResult.analysis.comparison.change_from_previous_percentage_points || 0) > 0 ? '+' : ''}{quizResult.analysis.comparison.change_from_previous_percentage_points} {t('percentage_points')}</strong></span>
+                            </div>
+                          )}
+                          {quizResult.analysis.comparison?.average_previous_accuracy != null && <p className="text-sm text-gray-500">{t('previous_average_accuracy')}: {quizResult.analysis.comparison.average_previous_accuracy}% ({quizResult.analysis.comparison.previous_quiz_count} {t('previous_quizzes')})</p>}
+                        </div>
+                        <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 p-4 space-y-3">
+                          <h5 className="font-bold">🧭 {t('next_practice_recommendation')}</h5>
+                          <p className="text-sm">{quizResult.analysis.recommended_next_practice?.topic}: {quizResult.analysis.recommended_next_practice?.reason}</p>
+                          <button type="button" onClick={() => startQuiz(quizResult.analysis.recommended_next_practice?.quiz_type || 'mixed')} className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700">{t('start_recommended_practice')}</button>
+                        </div>
+                      </section>
+                    )}
 
                     <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                       <h4 className={`font-bold text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{t('explanations_review')}</h4>
