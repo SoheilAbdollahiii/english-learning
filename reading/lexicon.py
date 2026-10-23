@@ -73,7 +73,7 @@ def _dictionary_entry(term):
         return {**PHRASES[normalized], "term_type": "phrase"}
     if normalized in COMMON_WORDS:
         return {**COMMON_WORDS[normalized], "term_type": "word"}
-    cache_key = "reading_dictionary_v1:" + normalized
+    cache_key = "reading_dictionary_v2:" + normalized
     cached = cache.get(cache_key)
     if cached:
         return cached
@@ -111,7 +111,9 @@ def _dictionary_entry(term):
         return entry
     return {
         "definition": "Meaning depends on how this word is used in the sentence. Read the context and try the example.",
-        "translation": "",
+        # Even when the dictionary has no entry (often true for phrasal verbs),
+        # still provide a Persian translation instead of an empty result.
+        "translation": _translate_to_persian(normalized),
         "example": "",
         "example_translation": "",
         "term_type": "phrase" if " " in normalized else "word",
