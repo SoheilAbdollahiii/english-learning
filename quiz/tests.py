@@ -98,6 +98,11 @@ class LearningQuizTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data["is_correct"])
         self.assertEqual(response.data["correct_answer"], question.correct_option)
+        self.assertTrue(response.data["correct_answer_text"])
+        self.assertTrue(response.data["explanation"])
+        self.assertTrue(response.data["example_sentence"])
+        self.assertTrue(response.data["example_translation"])
+        self.assertTrue(response.data["common_mistake"])
         self.assertNotIn("correct_option", response.data)
 
     def test_mixed_quiz_submission_accepts_questions_from_multiple_types_and_levels(self):

@@ -71,6 +71,48 @@ def get_quiz_questions(request):
     return Response(QuestionSerializer(selected, many=True).data)
 
 
+TEACHING_EXAMPLES = {
+    "conditionals": ("If it rains, we will stay home.", "اگر باران ببارد، در خانه می‌مانیم.", "Do not use 'will' in the if-clause for a real future condition."),
+    "verb_tenses": ("She has lived here for three years.", "او سه سال است که اینجا زندگی می‌کند.", "Choose the tense from the time clue; 'since' gives a starting point and 'for' gives a duration."),
+    "articles": ("I saw an elephant at the zoo.", "من در باغ‌وحش یک فیل دیدم.", "Use 'an' before a vowel sound, 'a' before a consonant sound, and 'the' for something specific."),
+    "prepositions": ("The meeting starts at nine o’clock.", "جلسه ساعت نه شروع می‌شود.", "Time and place prepositions are not interchangeable; learn them with common phrases."),
+    "modals": ("You should drink more water.", "بهتر است آب بیشتری بنوشی.", "A modal verb is followed by the base form: 'should go', not 'should to go'."),
+    "passive_voice": ("The bridge was built in 1990.", "این پل در سال ۱۹۹۰ ساخته شد.", "Passive voice uses a form of 'be' plus the past participle."),
+    "travel": ("I bought a ticket for the train.", "من برای قطار بلیت خریدم.", "Learn travel words in context and check which prepositions commonly follow them."),
+    "work": ("Our meeting starts at ten.", "جلسهٔ ما ساعت ده شروع می‌شود.", "Work-related words often appear in fixed collocations; learn the whole phrase."),
+    "education": ("The students are preparing for an exam.", "دانش‌آموزان برای یک امتحان آماده می‌شوند.", "Notice common word partnerships such as 'prepare for an exam'."),
+    "food": ("We had a delicious meal together.", "ما با هم یک وعدهٔ غذایی خوشمزه خوردیم.", "Check whether a word names food, a meal, an ingredient, or an action."),
+    "feelings": ("I felt nervous before the interview.", "قبل از مصاحبه احساس اضطراب داشتم.", "Feeling adjectives often describe a person’s state; check whether the word describes a feeling or its cause."),
+    "nature": ("The forest is home to many animals.", "جنگل زیستگاه حیوانات زیادی است.", "Use context clues to distinguish related nature and environment words."),
+    "main_idea": ("The passage mainly explains why exercise matters.", "این متن عمدتاً توضیح می‌دهد چرا ورزش اهمیت دارد.", "Do not choose an answer that mentions only one small detail when the question asks for the main idea."),
+    "detail": ("According to the text, the library closes at six.", "طبق متن، کتابخانه ساعت شش تعطیل می‌شود.", "For detail questions, find evidence in the passage instead of relying on outside knowledge."),
+    "inference": ("The streets are wet, so it probably rained.", "خیابان‌ها خیس‌اند، پس احتمالاً باران باریده است.", "An inference must be supported by clues in the text, not by an unsupported guess."),
+    "vocabulary": ("I learned a new word and used it in a sentence.", "یک واژهٔ جدید یاد گرفتم و آن را در جمله‌ای به کار بردم.", "Do not choose a word only because it looks familiar; check the meaning in the sentence."),
+    "reading": ("The writer gives two reasons to support the main point.", "نویسنده برای پشتیبانی از نکتهٔ اصلی دو دلیل می‌آورد.", "Base your answer on evidence from the passage."),
+    "grammar": ("She has finished her homework.", "او تکالیفش را تمام کرده است.", "Match the verb form to the subject and the tense; for example, use 'has' with he, she, or it."),
+}
+
+def teaching_feedback(question):
+    """Return consistent, actionable feedback for every answered question."""
+    example, translation, common_mistake = TEACHING_EXAMPLES.get(
+        question.topic or question.quiz_type,
+        TEACHING_EXAMPLES.get(question.quiz_type, TEACHING_EXAMPLES["vocabulary"]),
+    )
+    correct_answer = (question.correct_option or "").upper()
+    correct_text = getattr(question, f"option_{correct_answer.lower()}", "") if correct_answer in {"A", "B", "C", "D"} else ""
+    return {
+        "correct_answer": correct_answer,
+        "correct_answer_text": correct_text,
+        "explanation": question.explanation or (
+            f"The correct choice is {correct_answer} ({correct_text}). "
+            "Use the meaning and grammar of the full sentence to decide which option fits best."
+        ),
+        "example_sentence": question.example_sentence or example,
+        "example_translation": question.example_translation or translation,
+        "common_mistake": question.common_mistake or common_mistake,
+    }
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def check_quiz_answer(request):
@@ -89,9 +131,8 @@ def check_quiz_answer(request):
     payload = {
         "question_id": question.id,
         "user_answer": answer,
-        "correct_answer": question.correct_option.upper(),
         "is_correct": is_correct,
-        "explanation": question.explanation or "No explanation provided for this question.",
+        **teaching_feedback(question),
     }
 
     if str(request.data.get("adaptive", "")).lower() in {"1", "true", "yes", "on"}:
@@ -195,7 +236,7 @@ def submit_quiz(request):
             "user_answer": user_answer,
             "correct_answer": question.correct_option.upper(),
             "is_correct": is_correct,
-            "explanation": question.explanation or "No explanation provided for this question.",
+            **teaching_feedback(question),
         })
 
     total = len(details)
