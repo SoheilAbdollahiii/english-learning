@@ -187,7 +187,7 @@ def build_performance_analysis(details, duration_seconds, previous_sessions):
     topic_stats = {}
     mistake_counts = {}
     for item in details:
-        topic = (item.get("topic") or item.get("quiz_type") or "general").strip() or "general"
+        topic = (item.get("topic") or "").strip()\n        if not topic or topic.lower() == "general":\n            topic = item.get("quiz_type") or "general"
         stats = topic_stats.setdefault(topic, {"topic": topic, "attempted": 0, "correct": 0})
         stats["attempted"] += 1
         if item.get("is_correct"):
@@ -415,7 +415,7 @@ def submit_quiz(request):
             "quiz_type": question.quiz_type,
             "level": question.level,
             "difficulty": question.difficulty,
-            "topic": question.topic or question.quiz_type,
+            "topic": question.quiz_type if not question.topic or question.topic.lower() == "general" else question.topic,
             "question_text": question.question_text,
             "user_answer": user_answer,
             "correct_answer": question.correct_option.upper(),
