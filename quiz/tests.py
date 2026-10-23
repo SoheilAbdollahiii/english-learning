@@ -54,6 +54,21 @@ class LearningQuizTests(TestCase):
         response = self.client.get(reverse("quiz_questions"), {"type": "made-up"})
         self.assertEqual(response.status_code, 400)
 
+    def test_question_count_can_be_configured_and_is_bounded(self):
+        response = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "A1", "count": 2})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)
+
+        for count in ("0", "31", "not-a-number"):
+            invalid = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "A1", "count": count})
+            self.assertEqual(invalid.status_code, 400, count)
+
+    def test_all_level_filter_can_return_questions_from_supported_levels(self):
+        response = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "all", "count": 20})
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(len(response.data), 5)
+        self.assertTrue({item["level"] for item in response.data}.issubset({"A1", "B1", "C1"}))
+
     def test_invalid_cefr_level_is_rejected(self):
         response = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "A2"})
         self.assertEqual(response.status_code, 400)
@@ -136,9 +151,21 @@ class LearningQuizTests(TestCase):
             self.assertEqual(response.status_code, 400, question_id)
             self.assertIn("answers", response.data)
 
-    def test_submitting_more_than_five_answers_is_rejected(self):
-        questions = Question.objects.filter(quiz_type="grammar", level="A1").order_by("id")[:6]
-        self.assertEqual(len(questions), 6)
+    def test_submitting_more_than_thirty_answers_is_rejected(self):
+        base_question = Question.objects.filter(quiz_type="grammar", level="A1").first()
+        questions = [base_question]
+        for index in range(30):
+            questions.append(Question.objects.create(
+                quiz_type=base_question.quiz_type,
+                question_text=f"Extra test question {index}",
+                option_a=base_question.option_a,
+                option_b=base_question.option_b,
+                option_c=base_question.option_c,
+                option_d=base_question.option_d,
+                correct_option=base_question.correct_option,
+                explanation=base_question.explanation,
+                level=base_question.level,
+            ))
         answers = {str(question.id): question.correct_option for question in questions}
 
         response = self.client.post(
@@ -148,7 +175,7 @@ class LearningQuizTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("no more than five", response.data["answers"])
+        self.assertIn("no more than 30", response.data["answers"])
         self.assertEqual(QuizSession.objects.count(), 0)
 
     def test_empty_answers_are_rejected(self):
