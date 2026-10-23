@@ -47,6 +47,12 @@ class ThrottledTokenObtainPairView(TokenObtainPairView):
 @permission_classes([IsAuthenticated])
 def delete_account(request):
     """Permanently delete the authenticated learner and their owned data."""
+    if request.user.is_staff or request.user.is_superuser:
+        return Response(
+            {"detail": "Staff accounts must be managed through the admin interface."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     password = request.data.get("password", "")
     confirmation = request.data.get("confirmation", "")
     if confirmation != "DELETE":
