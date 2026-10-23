@@ -21,6 +21,10 @@ export default function App() {
   const [readingProgress, setReadingProgress] = useState([])
   const [quizHistory, setQuizHistory] = useState([])
   const [quizStats, setQuizStats] = useState({ current_streak: 0, quiz_sessions_total: 0, daily_activity: [] })
+  const [gamification, setGamification] = useState({ total_xp: 0, current_streak: 0, longest_streak: 0, badges: [] })
+  const [dailyChallengeInfo, setDailyChallengeInfo] = useState({ completed: false, question_count: 10, duration_seconds: 300, xp_awarded: 0 })
+  const [dailyChallengeLoading, setDailyChallengeLoading] = useState(false)
+  const [dailyChallengeMode, setDailyChallengeMode] = useState(false)
   const [preferences, setPreferences] = useState({ preferred_level: 'B1', daily_word_goal: 10, learning_goal: 'general' })
   const [preferencesSaving, setPreferencesSaving] = useState(false)
   const [readingQuery, setReadingQuery] = useState('')
@@ -68,7 +72,7 @@ export default function App() {
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [isRegistering, setIsRegistering] = useState(false)
 
-  const streak = quizStats.current_streak || 0
+  const streak = gamification.current_streak || 0
   const chartData = useMemo(() => {
     const daysFa = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه']
     const daysEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -194,7 +198,7 @@ export default function App() {
       setLoading(true)
       try {
         if (activeTab === 'dashboard') {
-          const [wordsRes, personalRes, articlesRes, writingsRes, preferencesRes, progressRes, historyRes, statsRes, reviewRes] = await Promise.all([
+          const [wordsRes, personalRes, articlesRes, writingsRes, preferencesRes, progressRes, historyRes, statsRes, reviewRes, gamificationRes] = await Promise.all([
             apiFetch(apiUrl('/vocabulary/api/words/')),
             apiFetch(apiUrl('/vocabulary/api/my-words/')),
             apiFetch(apiUrl('/reading/api/articles/')),
@@ -203,11 +207,12 @@ export default function App() {
             apiFetch(apiUrl('/reading/api/progress/')),
             apiFetch(apiUrl('/quiz/api/history/')),
             apiFetch(apiUrl('/quiz/api/stats/')),
-            apiFetch(apiUrl('/vocabulary/api/review/queue/'))
+            apiFetch(apiUrl('/vocabulary/api/review/queue/')),
+            apiFetch(apiUrl('/quiz/api/gamification/'))
           ])
-          const [wordsData, personalData, articlesData, writingsData, preferencesData, progressData, historyData, statsData, reviewData] = await Promise.all([
+          const [wordsData, personalData, articlesData, writingsData, preferencesData, progressData, historyData, statsData, reviewData, gamificationData] = await Promise.all([
             wordsRes.json(), personalRes.json(), articlesRes.json(), writingsRes.json(),
-            preferencesRes.json(), progressRes.json(), historyRes.json(), statsRes.json(), reviewRes.json()
+            preferencesRes.json(), progressRes.json(), historyRes.json(), statsRes.json(), reviewRes.json(), gamificationRes.json()
           ])
           setWords(Array.isArray(wordsData) ? wordsData : [])
           setPersonalWords(Array.isArray(personalData) ? personalData : [])
@@ -222,7 +227,15 @@ export default function App() {
           setReadingProgress(Array.isArray(progressData) ? progressData : [])
           setQuizHistory(Array.isArray(historyData) ? historyData : [])
           if (statsRes.ok) setQuizStats(statsData)
+        if (gamificationData.gamification) {
+          setGamification(gamificationData.gamification)
+          setDailyChallengeInfo(gamificationData.daily_challenge || { completed: false, question_count: 10, duration_seconds: 300, xp_awarded: 0 })
+        }
           setDueReviewCount(reviewRes.ok ? Number(reviewData.count) || 0 : 0)
+          if (gamificationRes.ok) {
+            setGamification(gamificationData.gamification || { total_xp: 0, current_streak: 0, longest_streak: 0, badges: [] })
+            setDailyChallengeInfo(gamificationData.daily_challenge || { completed: false, question_count: 10, duration_seconds: 300, xp_awarded: 0 })
+          }
         } else if (activeTab === 'reading') {
           const [articlesRes, progressRes] = await Promise.all([
             apiFetch(apiUrl('/reading/api/articles/')),
@@ -263,6 +276,60 @@ export default function App() {
 
     loadTabData()
   }, [activeTab, isLoggedIn])
+
+
+  const startDailyChallenge = async () => {
+    if (dailyChallengeLoading || dailyChallengeInfo.completed) return
+    setDailyChallengeLoading(true)
+    setQuizError('')
+    try {
+      const response = await apiFetch(apiUrl('/quiz/api/daily-challenge/'))
+      const data = await response.json()
+      if (!response.ok) {
+        setQuizError(data.detail || t('daily_challenge_load_failed'))
+        changeTab('quiz')
+        return
+      }
+      setGamification(data.gamification || gamification)
+      setDailyChallengeInfo({
+        date: data.date,
+        completed: data.completed,
+        question_count: data.question_count,
+        duration_seconds: data.duration_seconds,
+        xp_awarded: data.xp_awarded || 0,
+      })
+      if (data.completed) {
+        setQuizError(t('daily_challenge_already_done'))
+        changeTab('quiz')
+        return
+      }
+      setDailyChallengeMode(true)
+      setQuizType('mixed')
+      setQuizLevel('all')
+      setQuizQuestionCount(data.question_count)
+      setQuizTargetCount(data.question_count)
+      setQuizQuestions(data.questions || [])
+      setQuizAnswers({})
+      setQuizImmediateFeedback({})
+      setQuizResult(null)
+      setQuizSubmitted(false)
+      setCurrentQuestionIndex(0)
+      setQuizTimeExpired(false)
+      setQuizTotalDuration(data.duration_seconds)
+      setQuizTimeLeft(data.duration_seconds)
+      setQuizTimerMode('total')
+      setQuizAnswerMode('end')
+      setQuizAdaptiveMode(false)
+      setQuizNotice(t('daily_challenge_started'))
+      changeTab('quiz')
+    } catch (error) {
+      console.error('Could not load daily challenge:', error)
+      setQuizError(t('daily_challenge_load_failed'))
+      changeTab('quiz')
+    } finally {
+      setDailyChallengeLoading(false)
+    }
+  }
 
   const loadNextAdaptiveQuestion = async () => {
     if (loadingQuiz || quizQuestions.length >= quizTargetCount) return
@@ -381,13 +448,11 @@ export default function App() {
     setLoadingQuiz(true)
     setQuizError('')
     try {
-      const res = await apiFetch(apiUrl('/quiz/api/submit/'), {
+      const res = await apiFetch(apiUrl(dailyChallengeMode ? '/quiz/api/daily-challenge/submit/' : '/quiz/api/submit/'), {
         method: 'POST',
-        body: JSON.stringify({
-          quiz_type: quizType,
-          level: quizLevel,
-          answers: finalAnswers,
-        }),
+        body: JSON.stringify(dailyChallengeMode
+          ? { answers: finalAnswers }
+          : { quiz_type: quizType, level: quizLevel, answers: finalAnswers }),
       })
       const resultData = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -395,7 +460,14 @@ export default function App() {
         return
       }
 
-      setQuizResult(resultData)
+      const normalizedResult = dailyChallengeMode
+        ? { ...resultData, score: resultData.correct_answers, total: resultData.total }
+        : resultData
+      setQuizResult(normalizedResult)
+      if (dailyChallengeMode) {
+        setGamification(resultData.gamification || gamification)
+        setDailyChallengeInfo((current) => ({ ...current, completed: true, xp_awarded: resultData.xp_awarded || 0 }))
+      }
       setQuizSubmitted(true)
       setQuizTimeExpired(false)
 
@@ -403,9 +475,11 @@ export default function App() {
         const [historyRes, statsRes] = await Promise.all([
           apiFetch(apiUrl('/quiz/api/history/')),
           apiFetch(apiUrl('/quiz/api/stats/')),
+          apiFetch(apiUrl('/quiz/api/gamification/')),
         ])
         const historyData = await historyRes.json()
         const statsData = await statsRes.json()
+        const gamificationData = await (await apiFetch(apiUrl('/quiz/api/gamification/'))).json()
         if (historyRes.ok) setQuizHistory(Array.isArray(historyData) ? historyData : [])
         if (statsRes.ok) setQuizStats(statsData)
       } catch (refreshError) {
@@ -1327,6 +1401,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => {
+                          setDailyChallengeMode(false)
                           setQuizQuestions([])
                           setQuizSubmitted(false)
                           setQuizResult(null)
