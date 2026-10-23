@@ -771,13 +771,29 @@ export default function App() {
                     <p className="text-gray-500 text-sm">
                       {t('quiz_intro')}
                     </p>
-                    <button 
-                      onClick={() => startQuiz('vocabulary')}
-                      disabled={loadingQuiz}
-                      className="py-3 px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-colors shadow-sm"
-                    >
-                      {loadingQuiz ? t('loading') : t('start_vocabulary_quiz')}
-                    </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {[
+                        ['vocabulary', 'quiz_vocabulary'],
+                        ['reading', 'quiz_reading'],
+                        ['grammar', 'quiz_grammar'],
+                      ].map(([type, label]) => (
+                        <button key={type} onClick={() => startQuiz(type)} disabled={loadingQuiz} className="py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-colors shadow-sm disabled:opacity-50">
+                          {loadingQuiz && quizType === type ? t('loading') : t(label)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!quizQuestions.length && !quizSubmitted && quizHistory.length > 0 && (
+                  <div className={`p-6 rounded-2xl border space-y-3 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                    <h4 className="font-bold">{t('quiz_history')}</h4>
+                    {quizHistory.slice(0, 5).map((session) => (
+                      <div key={session.id} className="flex items-center justify-between gap-4 border-b last:border-0 border-gray-200 dark:border-gray-700 py-2 text-sm">
+                        <span>{t(`quiz_${session.quiz_type}`)} · {new Date(session.created_at).toLocaleDateString(i18n.language === 'fa' ? 'fa-IR' : 'en-US')}</span>
+                        <span className="font-bold text-indigo-500">{session.score}/{session.total_questions} ({session.percentage}%)</span>
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -859,7 +875,7 @@ export default function App() {
 
                     <div className="text-center pt-2">
                       <button 
-                        onClick={() => setQuizQuestions([])}
+                        onClick={() => { setQuizQuestions([]); setQuizSubmitted(false); setQuizResult(null); setCurrentQuestionIndex(0); setQuizAnswers({}) }}
                         className="py-3 px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-colors shadow-sm"
                       >
                         {t('take_another_quiz')}
