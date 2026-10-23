@@ -109,7 +109,7 @@ def _dictionary_entry(term):
                         "part_of_speech": part_of_speech,
                         "definition": definition.get("definition", ""),
                         "example": example,
-                        "example_translation": _translate_to_persian(example) if example else "",
+                        "example_translation": "",
                     })
                     api_synonyms.extend(definition.get("synonyms", []) if isinstance(definition.get("synonyms"), list) else [])
                     api_antonyms.extend(definition.get("antonyms", []) if isinstance(definition.get("antonyms"), list) else [])
