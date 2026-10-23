@@ -18,7 +18,7 @@ class ReadingProgressTests(TestCase):
         self.client.force_authenticate(user=self.learner)
 
     def test_reading_library_has_articles_for_all_levels(self):
-        self.assertGreaterEqual(Article.objects.count(), 15)
+        self.assertGreaterEqual(Article.objects.count(), 24, "Expanded reading library should be installed by migrations")
         for level in ("A1", "B1", "C1"):
             self.assertTrue(Article.objects.filter(level=level).exists(), f"Missing reading level {level}")
 
