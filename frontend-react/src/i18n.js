@@ -284,7 +284,7 @@ const resources = {
       quiz_adaptive_feedback: "سؤال بعدی: {{difficulty}}{{topic}}",
       quiz_general_topic: " از مبحث مرتبط",
       quiz_adaptive_answer_first: "برای باز شدن سؤال بعدی، ابتدا به این سؤال پاسخ بده.",
-      quiz_adaptive_mixed_unavailable: "حالت تطبیقی برای هر بار یک مهارت است. گرامر، واژگان یا درک مطلب را انتخاب کنید."
+      quiz_adaptive_mixed_unavailable: "حالت تطبیقی برای هر بار یک مهارت است. گرامر، واژگان یا درک مطلب را انتخاب کنید.",
       start_quiz: "شروع آزمون",
       incorrect: "پاسخ درست نیست",
       quiz_feedback_failed: "بررسی پاسخ انجام نشد. لطفاً دوباره تلاش کنید.",
