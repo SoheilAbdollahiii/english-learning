@@ -11,7 +11,7 @@ class WordSerializer(serializers.ModelSerializer):
 class UserWordSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserWord
-        fields = ["id", "english_word", "translation", "level", "proficiency", "next_review_at", "last_reviewed_at", "review_interval_days", "review_count", "correct_count", "incorrect_count", "created_at", "updated_at"]
+        fields = ["id", "english_word", "translation", "example", "level", "proficiency", "next_review_at", "last_reviewed_at", "review_interval_days", "review_count", "correct_count", "incorrect_count", "created_at", "updated_at"]
         read_only_fields = ["id", "proficiency", "next_review_at", "last_reviewed_at", "review_interval_days", "review_count", "correct_count", "incorrect_count", "created_at", "updated_at"]
 
     def validate_english_word(self, value):
