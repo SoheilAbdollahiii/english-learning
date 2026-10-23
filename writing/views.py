@@ -1,21 +1,33 @@
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
-from .services import analyze_text_with_llm
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from .models import WritingSubmission
+from .serializers import WritingSubmissionSerializer
 
-@login_required
-def submit_text(request):
-    context = {}
-    if request.method == 'POST':
-        text = request.POST.get('text', '').strip()
-        context['user_text'] = text
-        
-        if text:
-            ai_result = analyze_text_with_llm(text)
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def manage_writings(request):
+    if request.method == 'GET':
+        writings = WritingSubmission.objects.filter(user=request.user).order_by('-created_at')
+        serializer = WritingSubmissionSerializer(writings, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        serializer = WritingSubmissionSerializer(data=request.data)
+        if serializer.is_valid():
+            text = serializer.validated_data.get('original_text')
             
-            # بررسی اینکه آیا خطای سیستمی (مثل قطعی اینترنت یا نبودن کلید) داریم یا نه
-            if isinstance(ai_result, dict) and "system_error" in ai_result:
-                context['error_message'] = ai_result["system_error"]
-            else:
-                context['corrections'] = ai_result
-                
-    return render(request, 'writing/submit.html', context)
+            # تحلیل هوش مصنوعی آزمایشی
+            corrected = text.strip() + " (Checked & Optimized by AI)"
+            feedback = "Great job! Vocabulary and sentence structure are generally good."
+            score = 85
+
+            submission = serializer.save(
+                user=request.user,
+                corrected_text=corrected,
+                feedback=feedback,
+                score=score
+            )
+            
+            return Response(WritingSubmissionSerializer(submission).data, status=201)
+        return Response(serializer.errors, status=400)

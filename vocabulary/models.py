@@ -9,6 +9,6 @@ class Word(models.Model):
     english_word = models.CharField(max_length=100)
     translation = models.CharField(max_length=100)
     level = models.CharField(max_length=2, choices=LEVEL_CHOICES, default='A1')
-
+    proficiency = models.IntegerField(default=0)
     def __str__(self):
         return f"{self.english_word} ({self.level})"
