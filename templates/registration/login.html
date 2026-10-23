@@ -1,19 +1,36 @@
 {% extends 'base.html' %}
+{% block title %}Log in · English Studio{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-4">
-        <div class="card shadow-sm mt-5">
-            <div class="card-body p-4">
-                <h3 class="text-center mb-4">Login</h3>
-                <form method="post">
-                    {% csrf_token %}
-                    <!-- فرم پیش‌فرض جنگو -->
-                    {{ form.as_p }}
-                    <button type="submit" class="btn btn-primary w-100">Login</button>
-                </form>
+<div class="row justify-content-center align-items-center py-3 py-lg-5">
+    <div class="col-sm-10 col-md-7 col-lg-5 col-xl-4">
+        <section class="surface-card p-4 p-lg-5">
+            <div class="text-center mb-4">
+                <span class="brand-mark mb-3" style="margin-right:0;width:48px;height:48px;border-radius:16px;font-size:1.2rem;">E</span>
+                <span class="eyebrow d-block mt-2">WELCOME BACK</span>
+                <h1 class="h3 fw-bold mt-2 mb-2">Your next step starts here.</h1>
+                <p class="text-secondary mb-0">Log in to return to your personal learning space.</p>
             </div>
-        </div>
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
+            {% endif %}
+            <form method="post" action="{% url 'login' %}">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="{{ form.username.id_for_label }}">Username</label>
+                    <input class="form-control" type="text" name="{{ form.username.html_name }}" id="{{ form.username.id_for_label }}" value="{{ form.username.value|default:'' }}" autocomplete="username" autocapitalize="none" required autofocus>
+                    {% for error in form.username.errors %}<div class="small text-danger mt-1">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-semibold" for="{{ form.password.id_for_label }}">Password</label>
+                    <input class="form-control" type="password" name="{{ form.password.html_name }}" id="{{ form.password.id_for_label }}" autocomplete="current-password" required>
+                    {% for error in form.password.errors %}<div class="small text-danger mt-1">{{ error }}</div>{% endfor %}
+                </div>
+                {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+                <button type="submit" class="btn btn-primary btn-lg w-100">Log in <span aria-hidden="true">→</span></button>
+            </form>
+            <p class="text-secondary small text-center mt-4 mb-0">Your saved writing stays private to your account.</p>
+        </section>
     </div>
 </div>
 {% endblock %}
