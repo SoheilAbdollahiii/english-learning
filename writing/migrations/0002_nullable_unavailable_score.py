@@ -11,6 +11,12 @@ def clear_scores_without_corrections(apps, schema_editor):
     ).update(score=None)
 
 
+def restore_null_scores(apps, schema_editor):
+    """Restore the legacy non-null default before reversing the field change."""
+    WritingSubmission = apps.get_model("writing", "WritingSubmission")
+    WritingSubmission.objects.filter(score__isnull=True).update(score=0)
+
+
 class Migration(migrations.Migration):
     dependencies = [("writing", "0001_initial")]
 
@@ -20,5 +26,5 @@ class Migration(migrations.Migration):
             name="score",
             field=models.IntegerField(blank=True, null=True, default=None),
         ),
-        migrations.RunPython(clear_scores_without_corrections, migrations.RunPython.noop),
+        migrations.RunPython(clear_scores_without_corrections, restore_null_scores),
     ]
