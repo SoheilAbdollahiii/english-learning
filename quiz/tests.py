@@ -43,6 +43,12 @@ class LearningQuizTests(TestCase):
                 )
                 self.assertGreaterEqual(len(positions), 2, f"Answer positions are too predictable for {quiz_type}/{level}")
 
+    def test_correct_answer_positions_are_not_biased_to_one_letter(self):
+        for quiz_type in ("vocabulary", "reading", "grammar"):
+            for level in ("A1", "B1", "C1"):
+                keys = set(Question.objects.filter(quiz_type=quiz_type, level=level).values_list("correct_option", flat=True))
+                self.assertGreaterEqual(len(keys), 2, f"Answer positions are too predictable for {quiz_type} {level}")
+
     def test_invalid_quiz_type_is_rejected(self):
         response = self.client.get(reverse("quiz_questions"), {"type": "made-up"})
         self.assertEqual(response.status_code, 400)
