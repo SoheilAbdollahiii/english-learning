@@ -105,6 +105,25 @@ class LearningQuizTests(TestCase):
         self.assertTrue(response.data["common_mistake"])
         self.assertNotIn("correct_option", response.data)
 
+    def test_quiz_submission_includes_full_teaching_feedback(self):
+        question = Question.objects.filter(quiz_type="grammar", level="A1").first()
+        response = self.client.post(
+            reverse("quiz_submit"),
+            {
+                "quiz_type": "grammar",
+                "level": "A1",
+                "answers": {str(question.id): question.correct_option},
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        detail = response.data["details"][0]
+        for field in (
+            "correct_answer_text", "explanation", "example_sentence",
+            "example_translation", "common_mistake",
+        ):
+            self.assertTrue(detail[field], f"Missing educational feedback field: {field}")
+
     def test_mixed_quiz_submission_accepts_questions_from_multiple_types_and_levels(self):
         vocabulary = Question.objects.filter(quiz_type="vocabulary", level="A1").first()
         grammar = Question.objects.filter(quiz_type="grammar", level="B1").first()
