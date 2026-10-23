@@ -24,7 +24,7 @@ class SharedVocabularyPermissionsTests(TestCase):
         self.assertEqual(response.status_code, 401)
 
     def test_curated_vocabulary_has_a_substantial_bank_across_all_levels(self):
-        self.assertGreaterEqual(Word.objects.count(), 100)
+        self.assertGreaterEqual(Word.objects.count(), 280, "Expanded curated vocabulary should be installed by migrations")
         for level in ("A1", "B1", "C1"):
             self.assertTrue(Word.objects.filter(level=level).exists(), f"Missing vocabulary level {level}")
 
