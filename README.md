@@ -30,7 +30,7 @@ The React login screen supports self-service registration. `POST /api/register/`
 - `GET /vocabulary/api/words/` — curated shared vocabulary (authenticated)
 - `GET|POST /vocabulary/api/my-words/` — list or save the current user's words
 - `PATCH|DELETE /vocabulary/api/my-words/<id>/` — update translation/level/mastery or remove an owned word
-- `GET /vocabulary/api/review/queue/` — list up to 20 due personal words
+- `GET /vocabulary/api/review/queue/` — return the total due count and the next batch of up to 20 personal words
 - `POST /vocabulary/api/my-words/<id>/review/` with `{"remembered": true|false}` — record recall and schedule the next review
 - `POST /vocabulary/api/my-words/<id>/practice/` — backwards-compatible shortcut that records a successful recall
 - `GET /reading/api/articles/?q=<search>&level=A1` — search and filter reading content
