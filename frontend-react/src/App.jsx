@@ -4,7 +4,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 
 // Set VITE_API_BASE_URL when the frontend and API are deployed on different origins.
 // In production, an empty base uses same-origin routes; local development targets Django.
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? apiUrl('') : '')).replace(/\/$/, '')
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '')).replace(/\/$/, '')
 const apiUrl = (path) => `${API_BASE}${path}`
 
 function calculateCurrentStreak(sessions = []) {
