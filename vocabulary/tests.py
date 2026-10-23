@@ -82,8 +82,9 @@ class PersonalVocabularyTests(TestCase):
 
         response = self.client.get(reverse("review_queue"))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual([item["id"] for item in response.data], [due.id])
-        self.assertNotIn(future.id, [item["id"] for item in response.data])
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual([item["id"] for item in response.data["results"]], [due.id])
+        self.assertNotIn(future.id, [item["id"] for item in response.data["results"]])
 
     def test_successful_recall_increases_mastery_and_schedules_next_review(self):
         word = UserWord.objects.create(user=self.learner, english_word="resilient", proficiency=50)
