@@ -1091,13 +1091,13 @@ export default function App() {
                   <header className="flex items-start justify-between gap-4 border-b border-gray-200/20 p-5 sm:p-6">
                     <div>
                       <p className="text-xs font-extrabold uppercase tracking-wider text-indigo-500">{t('reading_lookup_eyebrow')}</p>
-                      <h2 id="reading-lookup-title" className="mt-1 text-2xl font-black" dir="ltr">{readingLookup.term || t('reading_sentence_translation')}</h2>
+                      <h2 id="reading-lookup-title" className="mt-1 text-2xl font-black" dir={readingLookup.term ? 'ltr' : (i18n.language === 'fa' ? 'rtl' : 'ltr')}>{readingLookup.term || t('reading_sentence_translation')}</h2>
                       <p className={`mt-1 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{!readingLookup.term ? t('reading_sentence_translation') : readingLookup.data?.term_type === 'phrase' ? t('reading_phrase') : t('reading_word')}</p>
                     </div>
                     <button onClick={closeReadingLookup} aria-label={t('close')} className={`rounded-xl p-2 text-xl ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>×</button>
                   </header>
                   <div className="space-y-5 p-5 sm:p-6">
-                    {readingLookupBusy && !readingLookup.data ? <div className="flex items-center gap-3 py-8 text-sm"><span className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />{t('reading_lookup_loading')}</div> : null}
+                    {readingLookupBusy && !readingLookup.data ? <div className="flex items-center gap-3 py-8 text-sm"><span className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />{readingLookup.term ? t('reading_lookup_loading') : t('reading_sentence_translation')}</div> : null}
                     {readingLookup.data && (
                       <>
                         {readingLookup.term && (
