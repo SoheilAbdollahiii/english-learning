@@ -41,10 +41,20 @@ export default function App() {
   const [loadingQuiz, setLoadingQuiz] = useState(false)
   const [quizType, setQuizType] = useState('vocabulary')
   const [quizLevel, setQuizLevel] = useState('B1')
-  const [quizTimerEnabled, setQuizTimerEnabled] = useState(false)
-  const [quizTimeLeft, setQuizTimeLeft] = useState(90)
+  const [quizQuestionCount, setQuizQuestionCount] = useState(5)
+  const [quizCustomQuestionCount, setQuizCustomQuestionCount] = useState(10)
+  const [quizDifficulty, setQuizDifficulty] = useState('all')
+  const [quizShuffle, setQuizShuffle] = useState(true)
+  const [quizAnswerMode, setQuizAnswerMode] = useState('end')
+  const [quizTimerMode, setQuizTimerMode] = useState('none')
+  const [quizTotalDuration, setQuizTotalDuration] = useState(300)
+  const [quizPerQuestionDuration, setQuizPerQuestionDuration] = useState(30)
+  const [quizQuestionTimeLeft, setQuizQuestionTimeLeft] = useState(30)
+  const [quizImmediateFeedback, setQuizImmediateFeedback] = useState({})
+  const [quizTimeLeft, setQuizTimeLeft] = useState(300)
   const [quizTimeExpired, setQuizTimeExpired] = useState(false)
   const [quizError, setQuizError] = useState('')
+  const [quizNotice, setQuizNotice] = useState('')
   
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('english-learning-theme') === 'dark')
   
@@ -82,17 +92,29 @@ export default function App() {
   }, [darkMode])
 
   useEffect(() => {
-    if (!quizTimerEnabled || !quizQuestions.length || quizSubmitted || quizTimeExpired || quizTimeLeft <= 0) return undefined
+    if (quizTimerMode === 'none' || !quizQuestions.length || quizSubmitted || quizTimeExpired) return undefined
     const timer = window.setTimeout(() => {
-      if (quizTimeLeft <= 1) {
-        setQuizTimeLeft(0)
-        setQuizTimeExpired(true)
+      if (quizTimerMode === 'total') {
+        if (quizTimeLeft <= 1) {
+          setQuizTimeLeft(0)
+          setQuizTimeExpired(true)
+        } else {
+          setQuizTimeLeft((left) => left - 1)
+        }
+      } else if (quizQuestionTimeLeft <= 1) {
+        if (currentQuestionIndex >= quizQuestions.length - 1) {
+          setQuizQuestionTimeLeft(0)
+          setQuizTimeExpired(true)
+        } else {
+          setCurrentQuestionIndex((index) => Math.min(quizQuestions.length - 1, index + 1))
+          setQuizQuestionTimeLeft(quizPerQuestionDuration)
+        }
       } else {
-        setQuizTimeLeft(quizTimeLeft - 1)
+        setQuizQuestionTimeLeft((left) => left - 1)
       }
     }, 1000)
     return () => window.clearTimeout(timer)
-  }, [quizTimerEnabled, quizQuestions.length, quizSubmitted, quizTimeExpired, quizTimeLeft])
+  }, [quizTimerMode, quizQuestions.length, quizSubmitted, quizTimeExpired, quizTimeLeft, quizQuestionTimeLeft, currentQuestionIndex, quizPerQuestionDuration])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -192,6 +214,7 @@ export default function App() {
             setPreferences(preferencesData)
             setReadingLevel(preferencesData.preferred_level)
             setVocabLevel(preferencesData.preferred_level)
+            setQuizLevel(preferencesData.preferred_level)
           }
           setReadingProgress(Array.isArray(progressData) ? progressData : [])
           setQuizHistory(Array.isArray(historyData) ? historyData : [])
@@ -240,12 +263,15 @@ export default function App() {
 
   const startQuiz = async (type = 'vocabulary') => {
     setQuizType(type)
-    const level = preferences.preferred_level || 'B1'
-    setQuizLevel(level)
+    const level = quizLevel || preferences.preferred_level || 'B1'
+    const count = quizQuestionCount === 0 ? quizCustomQuestionCount : quizQuestionCount
     setQuizQuestions([])
-    setQuizTimeLeft(90)
+    setQuizTimeLeft(quizTotalDuration)
+    setQuizQuestionTimeLeft(quizPerQuestionDuration)
+    setQuizImmediateFeedback({})
     setQuizTimeExpired(false)
     setQuizError('')
+    setQuizNotice('')
     setLoadingQuiz(true)
     setQuizSubmitted(false)
     setQuizResult(null)
@@ -253,10 +279,12 @@ export default function App() {
     setQuizAnswers({})
 
     try {
-      const res = await apiFetch(apiUrl(`/quiz/api/questions/?type=${type}&level=${level}`))
+      const res = await apiFetch(apiUrl(`/quiz/api/questions/?type=${type}&level=${level}&count=${count}&difficulty=${quizDifficulty}&shuffle=${quizShuffle}`))
       const data = await res.json()
       if (res.ok) {
-        setQuizQuestions(Array.isArray(data) ? data : [])
+        const loadedQuestions = Array.isArray(data) ? data : []
+        setQuizQuestions(loadedQuestions)
+        if (loadedQuestions.length < count) setQuizNotice(t('quiz_fewer_questions', { requested: count, available: loadedQuestions.length }))
       } else {
         setQuizQuestions([])
         alert(data.detail || t('quiz_load_failed'))
@@ -269,9 +297,27 @@ export default function App() {
     }
   }
 
-  const handleAnswerSelect = (questionId, optionKey) => {
+  const handleAnswerSelect = async (questionId, optionKey) => {
+    if (quizAnswerMode === 'each' && quizImmediateFeedback[questionId]) return
     setQuizAnswers((current) => ({ ...current, [questionId]: optionKey }))
     setQuizError('')
+    if (quizAnswerMode === 'each') {
+      try {
+        const response = await apiFetch(apiUrl('/quiz/api/check-answer/'), {
+          method: 'POST',
+          body: JSON.stringify({ question_id: questionId, answer: optionKey }),
+        })
+        const feedback = await response.json()
+        if (!response.ok) {
+          setQuizError(feedback.detail || t('quiz_feedback_failed'))
+          return
+        }
+        setQuizImmediateFeedback((current) => ({ ...current, [questionId]: feedback }))
+      } catch (error) {
+        console.error('Could not check quiz answer:', error)
+        setQuizError(t('quiz_feedback_failed'))
+      }
+    }
   }
 
   const submitQuizFinal = async (finalAnswers = quizAnswers, { allowPartial = false } = {}) => {
@@ -924,28 +970,83 @@ export default function App() {
                     <div className="text-5xl" aria-hidden="true">🎯</div>
                     <h3 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t('ready_quiz')}</h3>
                     <p className="text-gray-500 text-sm">{t('quiz_intro')}</p>
-                    <p className="text-xs font-bold text-indigo-500">{t('preferred_level')}: {preferences.preferred_level || 'B1'}</p>
-                    <label className={`inline-flex items-center justify-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold ${darkMode ? 'border-gray-700 bg-gray-900/40 text-gray-200' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>
-                      <input
-                        type="checkbox"
-                        checked={quizTimerEnabled}
-                        onChange={(event) => setQuizTimerEnabled(event.target.checked)}
-                        disabled={loadingQuiz}
-                        className="h-4 w-4 accent-indigo-600"
-                      />
-                      {t('quiz_timed_mode')}
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {[
-                        ['vocabulary', 'quiz_vocabulary'],
-                        ['reading', 'quiz_reading'],
-                        ['grammar', 'quiz_grammar'],
-                      ].map(([type, label]) => (
-                        <button key={type} onClick={() => startQuiz(type)} disabled={loadingQuiz} className="py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-colors shadow-sm disabled:opacity-50">
-                          {loadingQuiz && quizType === type ? t('loading') : t(label)}
-                        </button>
-                      ))}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+                      <label className="space-y-2 text-sm font-semibold">
+                        <span>{t('quiz_type_setting')}</span>
+                        <select value={quizType} onChange={(event) => setQuizType(event.target.value)} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                          {['vocabulary', 'reading', 'grammar', 'mixed'].map((type) => <option key={type} value={type}>{t(`quiz_${type}`)}</option>)}
+                        </select>
+                      </label>
+                      <label className="space-y-2 text-sm font-semibold">
+                        <span>{t('quiz_level_setting')}</span>
+                        <select value={quizLevel} onChange={(event) => setQuizLevel(event.target.value)} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                          <option value="A1">A1 · {t('level_beginner')}</option>
+                          <option value="A2">A2 · {t('level_elementary')}</option>
+                          <option value="B1">B1 · {t('level_intermediate')}</option>
+                          <option value="B2">B2 · {t('level_upper_intermediate')}</option>
+                          <option value="C1">C1 · {t('level_advanced')}</option>
+                          <option value="C2">C2 · {t('level_proficient')}</option>
+                          <option value="all">{t('all_levels')}</option>
+                        </select>
+                      </label>
+                      <label className="space-y-2 text-sm font-semibold">
+                        <span>{t('quiz_count_setting')}</span>
+                        <select value={quizQuestionCount} onChange={(event) => setQuizQuestionCount(Number(event.target.value))} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                          {[5, 10, 15, 20, 30].map((count) => <option key={count} value={count}>{count}</option>)}
+                          <option value={0}>{t('custom_count')}</option>
+                        </select>
+                      </label>
+                      {quizQuestionCount === 0 && (
+                        <label className="space-y-2 text-sm font-semibold">
+                          <span>{t('custom_count')} (1–30)</span>
+                          <input type="number" min="1" max="30" value={quizCustomQuestionCount} onChange={(event) => setQuizCustomQuestionCount(Math.min(30, Math.max(1, Number(event.target.value) || 1)))} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`} />
+                        </label>
+                      )}
+                      <label className="space-y-2 text-sm font-semibold">
+                        <span>{t('quiz_difficulty_setting')}</span>
+                        <select value={quizDifficulty} onChange={(event) => setQuizDifficulty(event.target.value)} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                          {['all', 'easy', 'medium', 'hard'].map((difficulty) => <option key={difficulty} value={difficulty}>{t(`difficulty_${difficulty}`)}</option>)}
+                        </select>
+                      </label>
+                      <label className="space-y-2 text-sm font-semibold">
+                        <span>{t('quiz_timer_setting')}</span>
+                        <select value={quizTimerMode} onChange={(event) => setQuizTimerMode(event.target.value)} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                          <option value="none">{t('timer_none')}</option>
+                          <option value="total">{t('timer_total')}</option>
+                          <option value="per-question">{t('timer_per_question')}</option>
+                        </select>
+                      </label>
+                      {quizTimerMode === 'total' && (
+                        <label className="space-y-2 text-sm font-semibold">
+                          <span>{t('quiz_total_duration')}</span>
+                          <select value={quizTotalDuration} onChange={(event) => setQuizTotalDuration(Number(event.target.value))} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                            {[300, 600, 900, 1800].map((seconds) => <option key={seconds} value={seconds}>{seconds / 60} {t('minutes')}</option>)}
+                          </select>
+                        </label>
+                      )}
+                      {quizTimerMode === 'per-question' && (
+                        <label className="space-y-2 text-sm font-semibold">
+                          <span>{t('quiz_question_duration')}</span>
+                          <select value={quizPerQuestionDuration} onChange={(event) => setQuizPerQuestionDuration(Number(event.target.value))} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                            {[15, 30, 60].map((seconds) => <option key={seconds} value={seconds}>{seconds} {t('seconds')}</option>)}
+                          </select>
+                        </label>
+                      )}
+                      <label className="space-y-2 text-sm font-semibold">
+                        <span>{t('quiz_answer_mode')}</span>
+                        <select value={quizAnswerMode} onChange={(event) => setQuizAnswerMode(event.target.value)} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                          <option value="end">{t('answers_at_end')}</option>
+                          <option value="each">{t('answers_after_each')}</option>
+                        </select>
+                      </label>
                     </div>
+                    <label className={`inline-flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold ${darkMode ? 'border-gray-700 bg-gray-900/40 text-gray-200' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>
+                      <input type="checkbox" checked={quizShuffle} onChange={(event) => setQuizShuffle(event.target.checked)} disabled={loadingQuiz} className="h-4 w-4 accent-indigo-600" />
+                      {t('quiz_shuffle_setting')}
+                    </label>
+                    <button type="button" onClick={() => startQuiz(quizType)} disabled={loadingQuiz} className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-colors shadow-sm disabled:opacity-50">
+                      {loadingQuiz ? t('loading') : t('start_quiz')}
+                    </button>
                   </div>
                 )}
 
@@ -966,9 +1067,10 @@ export default function App() {
                     <div className="flex flex-wrap justify-between items-center gap-3 text-xs font-bold text-gray-400">
                       <span>{t('question_counter', { current: currentQuestionIndex + 1, total: quizQuestions.length })}</span>
                       <span className="rounded-lg bg-indigo-50 dark:bg-indigo-950 px-3 py-1 text-indigo-600 dark:text-indigo-300">{quizQuestions[currentQuestionIndex].level}</span>
-                      {quizTimerEnabled && (
-                        <span role="timer" aria-live="off" className={`rounded-lg px-3 py-1 tabular-nums ${quizTimeLeft <= 15 || quizTimeExpired ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'}`}>
-                          ⏱ {Math.floor(quizTimeLeft / 60).toString().padStart(2, '0')}:{(quizTimeLeft % 60).toString().padStart(2, '0')}
+                      <span className="rounded-lg bg-violet-50 dark:bg-violet-950 px-3 py-1 text-violet-600 dark:text-violet-300">{t(`difficulty_${quizQuestions[currentQuestionIndex].difficulty || 'medium'}`)}</span>
+                      {quizTimerMode !== 'none' && (
+                        <span role="timer" aria-live="off" className={`rounded-lg px-3 py-1 tabular-nums ${(quizTimerMode === 'total' ? quizTimeLeft : quizQuestionTimeLeft) <= 15 || quizTimeExpired ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'}`}>
+                          ⏱ {Math.floor((quizTimerMode === 'total' ? quizTimeLeft : quizQuestionTimeLeft) / 60).toString().padStart(2, '0')}:{((quizTimerMode === 'total' ? quizTimeLeft : quizQuestionTimeLeft) % 60).toString().padStart(2, '0')}
                         </span>
                       )}
                     </div>
@@ -1011,15 +1113,27 @@ export default function App() {
                       })}
                     </div>
 
+                    {quizAnswerMode === 'each' && quizImmediateFeedback[quizQuestions[currentQuestionIndex].id] && (
+                      <div role="status" className={`rounded-xl border p-4 text-sm space-y-2 ${quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].is_correct ? (darkMode ? 'border-green-800 bg-green-950/30 text-green-200' : 'border-green-200 bg-green-50 text-green-800') : (darkMode ? 'border-red-800 bg-red-950/30 text-red-200' : 'border-red-200 bg-red-50 text-red-800')}`}>
+                        <strong>{quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].is_correct ? t('correct') : t('incorrect')}</strong>
+                        {!quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].is_correct && <p>{t('correct_was', { answer: quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].correct_answer })}</p>}
+                        <p>{t('explanation')}: {quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].explanation}</p>
+                      </div>
+                    )}
+
                     {quizTimeExpired && (
                       <div role="status" className={`rounded-xl border p-4 text-sm ${darkMode ? 'border-amber-800 bg-amber-950/30 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
                         {t('quiz_time_up')}
                         {Object.keys(quizAnswers).length === 0 && (
-                          <button type="button" onClick={() => { setQuizTimerEnabled(false); setQuizTimeExpired(false); setQuizTimeLeft(90); setQuizError('') }} className="mt-3 block font-bold underline">
+                          <button type="button" onClick={() => { setQuizTimerMode('none'); setQuizTimeExpired(false); setQuizTimeLeft(quizTotalDuration); setQuizQuestionTimeLeft(quizPerQuestionDuration); setQuizError('') }} className="mt-3 block font-bold underline">
                             {t('quiz_continue_untimed')}
                           </button>
                         )}
                       </div>
+                    )}
+
+                    {quizNotice && (
+                      <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">{quizNotice}</p>
                     )}
 
                     {quizError && (
@@ -1031,8 +1145,8 @@ export default function App() {
                     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
                       <button
                         type="button"
-                        disabled={currentQuestionIndex === 0 || loadingQuiz}
-                        onClick={() => { setCurrentQuestionIndex((index) => Math.max(0, index - 1)); setQuizError('') }}
+                        disabled={currentQuestionIndex === 0 || loadingQuiz || quizTimerMode === 'per-question'}
+                        onClick={() => { setCurrentQuestionIndex((index) => Math.max(0, index - 1)); setQuizQuestionTimeLeft(quizPerQuestionDuration); setQuizError('') }}
                         className={`rounded-xl border px-4 py-2.5 text-sm font-bold disabled:opacity-40 ${darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'}`}
                       >
                         {t('quiz_previous_question')}
@@ -1041,7 +1155,7 @@ export default function App() {
                         <button
                           type="button"
                           disabled={quizTimeExpired || loadingQuiz}
-                          onClick={() => { setCurrentQuestionIndex((index) => Math.min(quizQuestions.length - 1, index + 1)); setQuizError('') }}
+                          onClick={() => { setCurrentQuestionIndex((index) => Math.min(quizQuestions.length - 1, index + 1)); setQuizQuestionTimeLeft(quizPerQuestionDuration); setQuizError('') }}
                           className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
                         >
                           {t('quiz_next_question')}
@@ -1124,8 +1238,10 @@ export default function App() {
                           setCurrentQuestionIndex(0)
                           setQuizAnswers({})
                           setQuizError('')
+                          setQuizNotice('')
+                          setQuizImmediateFeedback({})
                           setQuizTimeExpired(false)
-                          setQuizTimeLeft(90)
+                          setQuizTimeLeft(quizTotalDuration)
                         }}
                         className="py-3 px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-colors shadow-sm"
                       >

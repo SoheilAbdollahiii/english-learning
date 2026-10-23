@@ -5,7 +5,7 @@ class QuestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Question
         # پاسخ صحیح را به کاربر نشان نمی‌دهیم تا تقلب نشود!
-        fields = ['id', 'quiz_type', 'question_text', 'option_a', 'option_b', 'option_c', 'option_d', 'level']
+        fields = ['id', 'quiz_type', 'question_text', 'option_a', 'option_b', 'option_c', 'option_d', 'level', 'difficulty']
 
 class QuizSessionSerializer(serializers.ModelSerializer):
     class Meta:

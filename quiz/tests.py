@@ -54,8 +54,84 @@ class LearningQuizTests(TestCase):
         response = self.client.get(reverse("quiz_questions"), {"type": "made-up"})
         self.assertEqual(response.status_code, 400)
 
+    def test_question_count_can_be_configured_and_is_bounded(self):
+        response = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "A1", "count": 2})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)
+
+        for count in ("0", "31", "not-a-number"):
+            invalid = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "A1", "count": count})
+            self.assertEqual(invalid.status_code, 400, count)
+
+    def test_all_level_filter_can_return_questions_from_supported_levels(self):
+        response = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "all", "count": 20})
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(len(response.data), 5)
+        self.assertTrue({item["level"] for item in response.data}.issubset({"A1", "A2", "B1", "B2", "C1", "C2"}))
+
+    def test_mixed_quiz_and_difficulty_filters_work(self):
+        response = self.client.get(reverse("quiz_questions"), {
+            "type": "mixed", "level": "all", "difficulty": "easy", "count": 30,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data)
+        self.assertTrue(all(item["difficulty"] == "easy" for item in response.data))
+        self.assertTrue({item["quiz_type"] for item in response.data}.issubset({"vocabulary", "reading", "grammar"}))
+
+        invalid = self.client.get(reverse("quiz_questions"), {"type": "grammar", "difficulty": "expert"})
+        self.assertEqual(invalid.status_code, 400)
+
+    def test_shuffle_can_be_disabled_for_stable_question_order(self):
+        response = self.client.get(reverse("quiz_questions"), {
+            "type": "grammar", "level": "A1", "count": 5, "shuffle": "false",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([item["id"] for item in response.data], sorted(item["id"] for item in response.data))
+
+    def test_instant_answer_check_returns_feedback_for_one_answer_only(self):
+        question = Question.objects.filter(quiz_type="grammar", level="A1").first()
+        response = self.client.post(
+            reverse("quiz_check_answer"),
+            {"question_id": question.id, "answer": question.correct_option},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["is_correct"])
+        self.assertEqual(response.data["correct_answer"], question.correct_option)
+        self.assertNotIn("correct_option", response.data)
+
+    def test_mixed_quiz_submission_accepts_questions_from_multiple_types_and_levels(self):
+        vocabulary = Question.objects.filter(quiz_type="vocabulary", level="A1").first()
+        grammar = Question.objects.filter(quiz_type="grammar", level="B1").first()
+        response = self.client.post(
+            reverse("quiz_submit"),
+            {
+                "quiz_type": "mixed",
+                "level": "all",
+                "answers": {
+                    str(vocabulary.id): vocabulary.correct_option,
+                    str(grammar.id): grammar.correct_option,
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["total"], 2)
+        self.assertEqual({item["quiz_type"] for item in response.data["details"]}, {"vocabulary", "grammar"})
+        self.assertEqual(QuizSession.objects.get(user=self.learner).quiz_type, "mixed")
+
+    def test_new_cefr_levels_have_questions_for_each_skill(self):
+        for quiz_type in ("vocabulary", "reading", "grammar"):
+            for level in ("A2", "B2", "C2"):
+                response = self.client.get(reverse("quiz_questions"), {
+                    "type": quiz_type, "level": level, "count": 30,
+                })
+                self.assertEqual(response.status_code, 200, f"Missing {quiz_type} content at {level}")
+                self.assertEqual(len(response.data), 8)
+                self.assertTrue(all(item["level"] == level for item in response.data))
+
     def test_invalid_cefr_level_is_rejected(self):
-        response = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "A2"})
+        response = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "D1"})
         self.assertEqual(response.status_code, 400)
 
     def test_questions_from_another_level_cannot_be_submitted(self):
@@ -136,9 +212,21 @@ class LearningQuizTests(TestCase):
             self.assertEqual(response.status_code, 400, question_id)
             self.assertIn("answers", response.data)
 
-    def test_submitting_more_than_five_answers_is_rejected(self):
-        questions = Question.objects.filter(quiz_type="grammar", level="A1").order_by("id")[:6]
-        self.assertEqual(len(questions), 6)
+    def test_submitting_more_than_thirty_answers_is_rejected(self):
+        base_question = Question.objects.filter(quiz_type="grammar", level="A1").first()
+        questions = [base_question]
+        for index in range(30):
+            questions.append(Question.objects.create(
+                quiz_type=base_question.quiz_type,
+                question_text=f"Extra test question {index}",
+                option_a=base_question.option_a,
+                option_b=base_question.option_b,
+                option_c=base_question.option_c,
+                option_d=base_question.option_d,
+                correct_option=base_question.correct_option,
+                explanation=base_question.explanation,
+                level=base_question.level,
+            ))
         answers = {str(question.id): question.correct_option for question in questions}
 
         response = self.client.post(
@@ -148,7 +236,7 @@ class LearningQuizTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("no more than five", response.data["answers"])
+        self.assertIn("no more than 30", response.data["answers"])
         self.assertEqual(QuizSession.objects.count(), 0)
 
     def test_empty_answers_are_rejected(self):

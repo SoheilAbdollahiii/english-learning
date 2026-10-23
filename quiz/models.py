@@ -23,6 +23,7 @@ class Question(models.Model):
     correct_option = models.CharField(max_length=1) # مقادیر مثل 'A', 'B', 'C', 'D'
     explanation = models.TextField(blank=True, null=True) # توضیح آموزشی بعد از پاسخ
     level = models.CharField(max_length=10, default='B1')
+    difficulty = models.CharField(max_length=10, choices=[('easy', 'Easy'), ('medium', 'Medium'), ('hard', 'Hard')], default='medium', db_index=True)
 
     def __str__(self):
         return f"[{self.quiz_type}] {self.question_text[:50]}"
