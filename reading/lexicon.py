@@ -96,7 +96,7 @@ def _dictionary_entry(term):
                         "translation": "",
                         "example": definition.get("example", ""),
                         "example_translation": "",
-                        "term_type": "word",
+                        "term_type": "phrase" if " " in normalized else "word",
                         "part_of_speech": meaning.get("partOfSpeech", ""),
                     }
                     break
@@ -163,7 +163,7 @@ def _translate_to_persian(text):
             payload = response.json()
             result = payload.get("responseData", {}) if isinstance(payload, dict) else {}
             translated = result.get("translatedText", "") if isinstance(result, dict) else ""
-            if isinstance(translated, str) and translated.strip():
+            if isinstance(translated, str) and translated.strip() and payload.get("responseStatus", 200) == 200:
                 from html import unescape
 
                 translated = unescape(translated).strip()
