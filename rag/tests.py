@@ -4,6 +4,7 @@ from django.test import SimpleTestCase, override_settings
 
 from .knowledge_base import retrieve_grammar_rule
 from .services import CorrectionUnavailable, correct_writing
+from .management.commands.diagnose_ai import classify_error
 
 
 class GrammarRetrievalTests(SimpleTestCase):
@@ -65,3 +66,23 @@ class CorrectWritingTests(SimpleTestCase):
         groq_cls.side_effect = RuntimeError("provider unavailable")
         with self.assertRaises(CorrectionUnavailable):
             correct_writing("I went home yesterday.")
+
+
+class ProviderDiagnosticTests(SimpleTestCase):
+    def test_classifies_permission_denied_without_exposing_exception_message(self):
+        exc = RuntimeError("sensitive response content")
+        exc.status_code = 403
+        diagnosis = classify_error(exc)
+        self.assertIn("HTTP 403", diagnosis)
+        self.assertNotIn("sensitive response content", diagnosis)
+
+    def test_classifies_rate_limit(self):
+        exc = RuntimeError("rate limit")
+        exc.status_code = 429
+        self.assertIn("HTTP 429", classify_error(exc))
+
+    def test_classifies_timeout_by_exception_type(self):
+        class ProviderTimeout(Exception):
+            pass
+
+        self.assertIn("timed out", classify_error(ProviderTimeout()))
