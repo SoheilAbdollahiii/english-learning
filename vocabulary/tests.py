@@ -1,5 +1,8 @@
 from django.contrib.auth import get_user_model
+from datetime import timedelta
+
 from django.test import TestCase
+from django.utils import timezone
 from django.urls import reverse
 from rest_framework.test import APIClient
 
@@ -67,6 +70,57 @@ class PersonalVocabularyTests(TestCase):
         response = self.client.post(reverse("practice_word", args=[word.id]), {}, format="json")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["proficiency"], 100)
+
+    def test_review_queue_is_private_and_only_contains_due_words(self):
+        due = UserWord.objects.create(user=self.learner, english_word="due-word")
+        future = UserWord.objects.create(
+            user=self.learner,
+            english_word="future-word",
+            next_review_at=timezone.now() + timedelta(days=2),
+        )
+        UserWord.objects.create(user=self.other, english_word="other-user-word")
+
+        response = self.client.get(reverse("review_queue"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([item["id"] for item in response.data], [due.id])
+        self.assertNotIn(future.id, [item["id"] for item in response.data])
+
+    def test_successful_recall_increases_mastery_and_schedules_next_review(self):
+        word = UserWord.objects.create(user=self.learner, english_word="resilient", proficiency=50)
+        response = self.client.post(
+            reverse("review_word", args=[word.id]), {"remembered": True}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["proficiency"], 60)
+        self.assertEqual(response.data["review_count"], 1)
+        self.assertEqual(response.data["correct_count"], 1)
+        self.assertEqual(response.data["review_interval_days"], 1)
+        word.refresh_from_db()
+        self.assertGreater(word.next_review_at, timezone.now() + timedelta(hours=23))
+
+    def test_failed_recall_reschedules_soon_and_reduces_mastery(self):
+        word = UserWord.objects.create(user=self.learner, english_word="forgetful", proficiency=5)
+        response = self.client.post(
+            reverse("review_word", args=[word.id]), {"remembered": False}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["proficiency"], 0)
+        self.assertEqual(response.data["incorrect_count"], 1)
+        self.assertEqual(response.data["review_interval_days"], 0)
+        word.refresh_from_db()
+        self.assertGreater(word.next_review_at, timezone.now() + timedelta(minutes=9))
+
+    def test_review_rejects_non_boolean_answer_and_other_users_word(self):
+        word = UserWord.objects.create(user=self.other, english_word="private")
+        response = self.client.post(
+            reverse("review_word", args=[word.id]), {"remembered": "yes"}, format="json"
+        )
+        self.assertEqual(response.status_code, 404)
+        own = UserWord.objects.create(user=self.learner, english_word="own-word")
+        invalid = self.client.post(
+            reverse("review_word", args=[own.id]), {"remembered": "yes"}, format="json"
+        )
+        self.assertEqual(invalid.status_code, 400)
 
     def test_user_cannot_edit_another_users_word(self):
         word = UserWord.objects.create(user=self.other, english_word="private")
