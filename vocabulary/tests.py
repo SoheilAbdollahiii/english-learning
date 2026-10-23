@@ -136,6 +136,14 @@ class PersonalVocabularyTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("level", response.data)
 
+    def test_fractional_mastery_value_is_rejected(self):
+        word = UserWord.objects.create(user=self.learner, english_word="precise", proficiency=25)
+        response = self.client.patch(
+            reverse("my_word_detail", args=[word.id]), {"proficiency": 1.5}, format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(UserWord.objects.get(id=word.id).proficiency, 25)
+
     def test_user_cannot_edit_another_users_word(self):
         word = UserWord.objects.create(user=self.other, english_word="private")
         response = self.client.patch(reverse("my_word_detail", args=[word.id]), {"translation": "secret"}, format="json")
