@@ -1,43 +1,69 @@
-import chromadb
-import os
+"""Small, offline document retriever for the English grammar knowledge base.
+
+Documents are stored with the application, so retrieval does not depend on downloading
+an embedding model at runtime. The selected document is passed to the LLM as RAG context.
+"""
+import re
+from pathlib import Path
+
 from django.conf import settings
 
-DB_PATH = os.path.join(settings.BASE_DIR, "chroma_db")
-client = chromadb.PersistentClient(path=DB_PATH)
-collection = client.get_or_create_collection(name="grammar_rules")
+KNOWLEDGE_FILE = Path(settings.BASE_DIR) / "rag" / "knowledge" / "grammar_rules.md"
+_TOKEN_RE = re.compile(r"[a-z]+")
+_STOP_WORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "been", "being", "but", "by",
+    "can", "did", "do", "does", "for", "from", "had", "has", "have", "he",
+    "her", "here", "him", "his", "how", "i", "if", "in", "into", "is", "it",
+    "its", "me", "my", "of", "on", "or", "our", "she", "so", "that", "the",
+    "their", "them", "there", "they", "this", "to", "us", "was", "we", "were",
+    "what", "when", "where", "which", "who", "will", "with", "you", "your",
+}
 
-def seed_knowledge_base():
-    if collection.count() == 0:
-        rules = [
-            "Past Simple Tense: Use the past simple for actions that finished in the past. Example: 'I went to school yesterday' (NOT 'I go to school yesterday').",
-            "Subject-Verb Agreement: A singular subject takes a singular verb. Example: 'He plays tennis' (NOT 'He play tennis').",
-            "Articles: Use 'an' before words starting with a vowel sound. Example: 'an apple' (NOT 'a apple')."
-        ]
-        ids = ["rule_1", "rule_2", "rule_3"]
-        
-        try:
-            # تلاش برای دانلود مدل و اضافه کردن به دیتابیس
-            collection.add(documents=rules, ids=ids)
-        except Exception as e:
-            print(f"Network timeout during ChromaDB model download. Using Mock RAG. Error: {e}")
 
-def retrieve_grammar_rule(error_text):
-    try:
-        # اگر دیتابیس خالی است، تلاش کن آن را پر کنی
-        if collection.count() == 0:
-            seed_knowledge_base()
-            
-        # تلاش برای جستجوی واقعی
-        results = collection.query(
-            query_texts=[error_text],
-            n_results=1
-        )
-        
-        if results.get('documents') and results['documents'][0]:
-            return results['documents'][0][0]
-            
-    except Exception:
-        # اگر اینترنت قطع بود یا دانلود مدل تایم‌اوت شد، این قانون تستی برمی‌گردد تا پروژه متوقف نشود
-        return "Mock Rule (Network Timeout): Past Simple Tense is used for completed actions in the past."
-        
-    return "No specific grammar rule found in the knowledge base."
+def _tokens(text):
+    return {
+        token for token in _TOKEN_RE.findall(text.lower())
+        if len(token) > 1 and token not in _STOP_WORDS
+    }
+
+
+def _load_documents():
+    if not KNOWLEDGE_FILE.exists():
+        return []
+    raw = KNOWLEDGE_FILE.read_text(encoding="utf-8")
+    sections = re.split(r"(?m)^##\s+", raw)
+    documents = []
+    for section in sections:
+        section = section.strip()
+        if not section or section.startswith("# "):
+            continue
+        heading, _, body = section.partition("\n")
+        body = body.strip()
+        if heading and body:
+            documents.append({"title": heading.strip(), "content": body})
+    return documents
+
+
+def retrieve_grammar_rule(error_text: str) -> str:
+    """Return the most relevant rule from local documents, or an explicit no-match."""
+    query_tokens = _tokens(error_text)
+    documents = _load_documents()
+    if not query_tokens or not documents:
+        return "No matching grammar reference was found in the local knowledge base."
+
+    ranked = []
+    for document in documents:
+        doc_tokens = _tokens(document["title"] + " " + document["content"])
+        overlap = query_tokens & doc_tokens
+        if overlap:
+            # Normalize overlap so long documents do not win solely by length.
+            score = len(overlap) / (len(query_tokens) * len(doc_tokens)) ** 0.5
+            ranked.append((score, document))
+    if not ranked:
+        return "No matching grammar reference was found in the local knowledge base."
+
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    best_score, best = ranked[0]
+    if best_score < 0.08:
+        return "No matching grammar reference was found in the local knowledge base."
+    return f"{best['title']}\n{best['content']}"

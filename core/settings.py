@@ -11,6 +11,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Keep secrets in environment variables (or a local .env file), never in source.
 SECRET_KEY = config("SECRET_KEY")
 DEBUG = config("DEBUG", default=False, cast=bool)
+GROQ_API_KEY = config("GROQ_API_KEY", default="")
+GROQ_MODEL = config("GROQ_MODEL", default="llama-3.3-70b-versatile")
 ALLOWED_HOSTS = [
     host.strip()
     for host in config(
