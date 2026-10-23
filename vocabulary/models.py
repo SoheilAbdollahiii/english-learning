@@ -24,6 +24,7 @@ class UserWord(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_words")
     english_word = models.CharField(max_length=100)
     translation = models.CharField(max_length=100, blank=True, default="")
+    example = models.CharField(max_length=400, blank=True, default="")
     level = models.CharField(max_length=2, choices=LEVEL_CHOICES, default="B1")
     proficiency = models.PositiveSmallIntegerField(default=0)
     next_review_at = models.DateTimeField(default=timezone.now)
