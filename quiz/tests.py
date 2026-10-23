@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
+from datetime import timedelta
 from rest_framework.test import APIClient
 
 from .models import Question, QuizSession
@@ -57,3 +59,22 @@ class LearningQuizTests(TestCase):
     def test_empty_answers_are_rejected(self):
         response = self.client.post(reverse("quiz_submit"), {"quiz_type": "reading", "answers": {}}, format="json")
         self.assertEqual(response.status_code, 400)
+
+    def test_stats_calculate_real_streak_and_are_private(self):
+        today_session = QuizSession.objects.create(
+            user=self.learner, quiz_type="grammar", score=1, total_questions=1
+        )
+        yesterday_session = QuizSession.objects.create(
+            user=self.learner, quiz_type="reading", score=1, total_questions=1
+        )
+        yesterday_session.created_at = timezone.now() - timedelta(days=1)
+        yesterday_session.save(update_fields=["created_at"])
+        QuizSession.objects.create(
+            user=self.other, quiz_type="vocabulary", score=1, total_questions=1
+        )
+
+        response = self.client.get(reverse("quiz_stats"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["current_streak"], 2)
+        self.assertEqual(response.data["quiz_sessions_total"], 2)
+        self.assertEqual(response.data["daily_activity"][-1]["count"], 1)
