@@ -763,7 +763,7 @@ def submit_daily_challenge(request):
             details.append({
                 "question_id": question.id,
                 "quiz_type": question.quiz_type,
-                "topic": question.topic or question.quiz_type,
+                "topic": question.quiz_type if not question.topic or question.topic.lower() == "general" else question.topic,
                 "level": question.level,
                 "question_text": question.question_text,
                 "user_answer": user_answer,
