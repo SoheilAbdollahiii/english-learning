@@ -20,6 +20,10 @@ An English-learning application with a Django REST API, a React learning interfa
 - **Skill quizzes:** Separate vocabulary, reading, and grammar quizzes are seeded by a data migration. Results include explanations and are saved to a private per-user history.
 - **Progress data:** The dashboard chart is based on saved quiz sessions, not a fabricated activity curve.
 
+### Learner onboarding
+
+The React login screen supports self-service registration. `POST /api/register/` validates the username and password, applies anonymous rate limiting, creates the account, and returns JWT tokens. Email is optional in this initial release; email verification and password recovery remain launch requirements.
+
 ### Stage 3 API routes
 
 - `GET /vocabulary/api/words/` — curated shared vocabulary (authenticated)
@@ -103,6 +107,6 @@ The React app does not assume that the Django API runs on the same machine as th
 
 ### Product-readiness notes
 
-- The dashboard's streak now counts consecutive days with saved quiz activity. It is not a count of logins, and currently measures quiz sessions rather than every possible learning action.
+- The dashboard's streak and seven-day activity chart use per-user quiz-session statistics from the API, not login dates or a capped recent-history list. They measure quiz sessions, not every possible learning action.
 - Before public launch, configure HTTPS and review Django's deployment checks, token storage/XSS exposure, rate limits for authentication and AI correction, backups, privacy/retention terms, monitoring, and the current npm audit findings.
 - A passing CI build validates the automated checks; it does not replace a real-browser acceptance test with a configured API key and production-like environment.
