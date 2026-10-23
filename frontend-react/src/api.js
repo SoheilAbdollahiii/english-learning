@@ -1,7 +1,7 @@
 // Centralized API transport and JWT refresh handling.
 // Set VITE_API_BASE_URL when the frontend and API are deployed on different origins.
-// In production, an empty base uses same-origin routes; local development targets Django.
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '')).replace(/\/$/, '')
+// Without an override, API calls are same-origin (Vite proxies them to Django in development).
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
 export const apiUrl = (path) => `${API_BASE}${path}`
 
