@@ -67,10 +67,13 @@ def my_word_detail(request, word_id):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     if "proficiency" in request.data:
-        try:
-            proficiency = int(request.data["proficiency"])
-        except (TypeError, ValueError):
+        raw_proficiency = request.data["proficiency"]
+        if isinstance(raw_proficiency, bool) or not (
+            isinstance(raw_proficiency, int)
+            or isinstance(raw_proficiency, str) and raw_proficiency.strip().lstrip("-").isdigit()
+        ):
             return Response({"proficiency": "Enter an integer from 0 to 100."}, status=status.HTTP_400_BAD_REQUEST)
+        proficiency = int(raw_proficiency)
         if not 0 <= proficiency <= 100:
             return Response({"proficiency": "Enter a value from 0 to 100."}, status=status.HTTP_400_BAD_REQUEST)
         word.proficiency = proficiency
@@ -78,7 +81,7 @@ def my_word_detail(request, word_id):
         word.translation = str(request.data["translation"]).strip()[:100]
     if "level" in request.data:
         level = request.data["level"]
-        if level not in dict(UserWord.LEVEL_CHOICES):
+        if not isinstance(level, str) or level not in dict(UserWord.LEVEL_CHOICES):
             return Response({"level": "Choose A1, B1, or C1."}, status=status.HTTP_400_BAD_REQUEST)
         word.level = level
     word.save()
