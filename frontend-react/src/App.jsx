@@ -55,6 +55,9 @@ export default function App() {
   const [quizTimeExpired, setQuizTimeExpired] = useState(false)
   const [quizError, setQuizError] = useState('')
   const [quizNotice, setQuizNotice] = useState('')
+  const [quizAdaptiveMode, setQuizAdaptiveMode] = useState(false)
+  const [quizTargetCount, setQuizTargetCount] = useState(5)
+  const [quizAdaptiveProgress, setQuizAdaptiveProgress] = useState(null)
   
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('english-learning-theme') === 'dark')
   
@@ -92,7 +95,7 @@ export default function App() {
   }, [darkMode])
 
   useEffect(() => {
-    if (quizTimerMode === 'none' || !quizQuestions.length || quizSubmitted || quizTimeExpired) return undefined
+    if (quizAdaptiveMode || quizTimerMode === 'none' || !quizQuestions.length || quizSubmitted || quizTimeExpired) return undefined
     const timer = window.setTimeout(() => {
       if (quizTimerMode === 'total') {
         if (quizTimeLeft <= 1) {
@@ -114,7 +117,7 @@ export default function App() {
       }
     }, 1000)
     return () => window.clearTimeout(timer)
-  }, [quizTimerMode, quizQuestions.length, quizSubmitted, quizTimeExpired, quizTimeLeft, quizQuestionTimeLeft, currentQuestionIndex, quizPerQuestionDuration])
+  }, [quizAdaptiveMode, quizTimerMode, quizQuestions.length, quizSubmitted, quizTimeExpired, quizTimeLeft, quizQuestionTimeLeft, currentQuestionIndex, quizPerQuestionDuration])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -261,11 +264,37 @@ export default function App() {
     loadTabData()
   }, [activeTab, isLoggedIn])
 
+  const loadNextAdaptiveQuestion = async () => {
+    if (loadingQuiz || quizQuestions.length >= quizTargetCount) return
+    setLoadingQuiz(true)
+    setQuizError('')
+    try {
+      const level = quizLevel || preferences.preferred_level || 'B1'
+      const response = await apiFetch(apiUrl(`/quiz/api/adaptive/next/?skill=${quizType}&level=${level}`))
+      const data = await response.json()
+      if (!response.ok) {
+        setQuizError(data.detail || t('quiz_load_failed'))
+        return
+      }
+      setQuizQuestions((current) => [...current, data.question])
+      setCurrentQuestionIndex((current) => current + 1)
+      setQuizAdaptiveProgress(data.progress || null)
+      setQuizQuestionTimeLeft(quizPerQuestionDuration)
+    } catch (error) {
+      console.error('Could not load next adaptive question:', error)
+      setQuizError(t('quiz_load_failed'))
+    } finally {
+      setLoadingQuiz(false)
+    }
+  }
+
   const startQuiz = async (type = 'vocabulary') => {
     setQuizType(type)
     const level = quizLevel || preferences.preferred_level || 'B1'
     const count = quizQuestionCount === 0 ? quizCustomQuestionCount : quizQuestionCount
     setQuizQuestions([])
+    setQuizTargetCount(count)
+    setQuizAdaptiveProgress(null)
     setQuizTimeLeft(quizTotalDuration)
     setQuizQuestionTimeLeft(quizPerQuestionDuration)
     setQuizImmediateFeedback({})
@@ -279,6 +308,20 @@ export default function App() {
     setQuizAnswers({})
 
     try {
+      if (quizAdaptiveMode) {
+        const res = await apiFetch(apiUrl(`/quiz/api/adaptive/next/?skill=${type}&level=${level}`))
+        const data = await res.json()
+        if (!res.ok) {
+          setQuizQuestions([])
+          setQuizError(data.detail || t('quiz_load_failed'))
+          return
+        }
+        setQuizQuestions([data.question])
+        setQuizAdaptiveProgress(data.progress || null)
+        setQuizAnswerMode('each')
+        setQuizTimerMode('none')
+        return
+      }
       const res = await apiFetch(apiUrl(`/quiz/api/questions/?type=${type}&level=${level}&count=${count}&difficulty=${quizDifficulty}&shuffle=${quizShuffle}`))
       const data = await res.json()
       if (res.ok) {
@@ -287,25 +330,25 @@ export default function App() {
         if (loadedQuestions.length < count) setQuizNotice(t('quiz_fewer_questions', { requested: count, available: loadedQuestions.length }))
       } else {
         setQuizQuestions([])
-        alert(data.detail || t('quiz_load_failed'))
+        setQuizError(data.detail || t('quiz_load_failed'))
       }
     } catch (err) {
       console.error('Error fetching quiz questions:', err)
-      alert(t('quiz_load_failed'))
+      setQuizError(t('quiz_load_failed'))
     } finally {
       setLoadingQuiz(false)
     }
   }
 
   const handleAnswerSelect = async (questionId, optionKey) => {
-    if (quizAnswerMode === 'each' && quizImmediateFeedback[questionId]) return
+    if ((quizAdaptiveMode || quizAnswerMode === 'each') && quizImmediateFeedback[questionId]) return
     setQuizAnswers((current) => ({ ...current, [questionId]: optionKey }))
     setQuizError('')
-    if (quizAnswerMode === 'each') {
+    if (quizAdaptiveMode || quizAnswerMode === 'each') {
       try {
         const response = await apiFetch(apiUrl('/quiz/api/check-answer/'), {
           method: 'POST',
-          body: JSON.stringify({ question_id: questionId, answer: optionKey }),
+          body: JSON.stringify({ question_id: questionId, answer: optionKey, adaptive: quizAdaptiveMode }),
         })
         const feedback = await response.json()
         if (!response.ok) {
@@ -313,6 +356,7 @@ export default function App() {
           return
         }
         setQuizImmediateFeedback((current) => ({ ...current, [questionId]: feedback }))
+        if (feedback.adaptive_progress) setQuizAdaptiveProgress(feedback.adaptive_progress)
       } catch (error) {
         console.error('Could not check quiz answer:', error)
         setQuizError(t('quiz_feedback_failed'))
@@ -1004,13 +1048,13 @@ export default function App() {
                       )}
                       <label className="space-y-2 text-sm font-semibold">
                         <span>{t('quiz_difficulty_setting')}</span>
-                        <select value={quizDifficulty} onChange={(event) => setQuizDifficulty(event.target.value)} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                        <select value={quizDifficulty} onChange={(event) => setQuizDifficulty(event.target.value)} disabled={loadingQuiz || quizAdaptiveMode} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
                           {['all', 'easy', 'medium', 'hard'].map((difficulty) => <option key={difficulty} value={difficulty}>{t(`difficulty_${difficulty}`)}</option>)}
                         </select>
                       </label>
                       <label className="space-y-2 text-sm font-semibold">
                         <span>{t('quiz_timer_setting')}</span>
-                        <select value={quizTimerMode} onChange={(event) => setQuizTimerMode(event.target.value)} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                        <select value={quizTimerMode} onChange={(event) => setQuizTimerMode(event.target.value)} disabled={loadingQuiz || quizAdaptiveMode} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
                           <option value="none">{t('timer_none')}</option>
                           <option value="total">{t('timer_total')}</option>
                           <option value="per-question">{t('timer_per_question')}</option>
@@ -1044,6 +1088,18 @@ export default function App() {
                       <input type="checkbox" checked={quizShuffle} onChange={(event) => setQuizShuffle(event.target.checked)} disabled={loadingQuiz} className="h-4 w-4 accent-indigo-600" />
                       {t('quiz_shuffle_setting')}
                     </label>
+                    <label className={`inline-flex items-start gap-3 rounded-xl border px-4 py-3 text-sm font-semibold ${darkMode ? 'border-indigo-800 bg-indigo-950/30 text-gray-200' : 'border-indigo-200 bg-indigo-50 text-gray-700'}`}>
+                      <input type="checkbox" checked={quizAdaptiveMode} onChange={(event) => setQuizAdaptiveMode(event.target.checked)} disabled={loadingQuiz} className="mt-0.5 h-4 w-4 accent-indigo-600" />
+                      <span className="space-y-1">
+                        <span className="block">{t('quiz_adaptive_mode')}</span>
+                        <span className="block text-xs font-normal opacity-80">{t('quiz_adaptive_desc')}</span>
+                      </span>
+                    </label>
+                    {quizAdaptiveMode && quizAdaptiveProgress && (
+                      <div className={`rounded-xl border p-3 text-sm ${darkMode ? 'border-gray-700 bg-gray-900/40 text-gray-200' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>
+                        {t('quiz_adaptive_status', { skill: t(`quiz_${quizAdaptiveProgress.skill}`), difficulty: t(`difficulty_${quizAdaptiveProgress.current_difficulty}`), accuracy: quizAdaptiveProgress.accuracy })}
+                      </div>
+                    )}
                     <button type="button" onClick={() => startQuiz(quizType)} disabled={loadingQuiz} className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-colors shadow-sm disabled:opacity-50">
                       {loadingQuiz ? t('loading') : t('start_quiz')}
                     </button>
@@ -1065,7 +1121,7 @@ export default function App() {
                 {quizQuestions.length > 0 && !quizSubmitted && (
                   <div className={`p-6 sm:p-8 rounded-3xl shadow-sm border space-y-6 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                     <div className="flex flex-wrap justify-between items-center gap-3 text-xs font-bold text-gray-400">
-                      <span>{t('question_counter', { current: currentQuestionIndex + 1, total: quizQuestions.length })}</span>
+                      <span>{t('question_counter', { current: currentQuestionIndex + 1, total: quizAdaptiveMode ? quizTargetCount : quizQuestions.length })}</span>
                       <span className="rounded-lg bg-indigo-50 dark:bg-indigo-950 px-3 py-1 text-indigo-600 dark:text-indigo-300">{quizQuestions[currentQuestionIndex].level}</span>
                       <span className="rounded-lg bg-violet-50 dark:bg-violet-950 px-3 py-1 text-violet-600 dark:text-violet-300">{t(`difficulty_${quizQuestions[currentQuestionIndex].difficulty || 'medium'}`)}</span>
                       {quizTimerMode !== 'none' && (
@@ -1076,8 +1132,8 @@ export default function App() {
                     </div>
 
                     <div>
-                      <div className={`h-2.5 w-full overflow-hidden rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`} role="progressbar" aria-label={t('quiz_progress')} aria-valuemin={0} aria-valuemax={quizQuestions.length} aria-valuenow={currentQuestionIndex + 1}>
-                        <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-300" style={{ width: `${((currentQuestionIndex + 1) / quizQuestions.length) * 100}%` }} />
+                      <div className={`h-2.5 w-full overflow-hidden rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`} role="progressbar" aria-label={t('quiz_progress')} aria-valuemin={0} aria-valuemax={quizAdaptiveMode ? quizTargetCount : quizQuestions.length} aria-valuenow={currentQuestionIndex + 1}>
+                        <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-300" style={{ width: `${((currentQuestionIndex + 1) / (quizAdaptiveMode ? quizTargetCount : quizQuestions.length)) * 100}%` }} />
                       </div>
                       <p className={`mt-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                         {t('quiz_answered_count', { answered: Object.keys(quizAnswers).length, total: quizQuestions.length })}
@@ -1113,11 +1169,17 @@ export default function App() {
                       })}
                     </div>
 
-                    {quizAnswerMode === 'each' && quizImmediateFeedback[quizQuestions[currentQuestionIndex].id] && (
+                    {(quizAdaptiveMode || quizAnswerMode === 'each') && quizImmediateFeedback[quizQuestions[currentQuestionIndex].id] && (
                       <div role="status" className={`rounded-xl border p-4 text-sm space-y-2 ${quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].is_correct ? (darkMode ? 'border-green-800 bg-green-950/30 text-green-200' : 'border-green-200 bg-green-50 text-green-800') : (darkMode ? 'border-red-800 bg-red-950/30 text-red-200' : 'border-red-200 bg-red-50 text-red-800')}`}>
                         <strong>{quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].is_correct ? t('correct') : t('incorrect')}</strong>
                         {!quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].is_correct && <p>{t('correct_was', { answer: quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].correct_answer })}</p>}
                         <p>{t('explanation')}: {quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].explanation}</p>
+                        {quizAdaptiveMode && quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].adaptive_progress && (
+                          <p className="pt-1 font-semibold">{t('quiz_adaptive_feedback', {
+                            difficulty: t(`difficulty_${quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].recommended_next_difficulty}`),
+                            topic: quizImmediateFeedback[quizQuestions[currentQuestionIndex].id].recommended_topic || t('quiz_general_topic'),
+                          })}</p>
+                        )}
                       </div>
                     )}
 
@@ -1145,13 +1207,27 @@ export default function App() {
                     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
                       <button
                         type="button"
-                        disabled={currentQuestionIndex === 0 || loadingQuiz || quizTimerMode === 'per-question'}
+                        disabled={quizAdaptiveMode || currentQuestionIndex === 0 || loadingQuiz || quizTimerMode === 'per-question'}
                         onClick={() => { setCurrentQuestionIndex((index) => Math.max(0, index - 1)); setQuizQuestionTimeLeft(quizPerQuestionDuration); setQuizError('') }}
                         className={`rounded-xl border px-4 py-2.5 text-sm font-bold disabled:opacity-40 ${darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'}`}
                       >
                         {t('quiz_previous_question')}
                       </button>
-                      {currentQuestionIndex < quizQuestions.length - 1 && !quizTimeExpired ? (
+                      {quizAdaptiveMode ? (
+                        quizImmediateFeedback[quizQuestions[currentQuestionIndex].id] ? (
+                          quizQuestions.length < quizTargetCount ? (
+                            <button type="button" disabled={loadingQuiz} onClick={loadNextAdaptiveQuestion} className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50">
+                              {loadingQuiz ? t('loading') : t('quiz_next_question')}
+                            </button>
+                          ) : (
+                            <button type="button" disabled={loadingQuiz} onClick={() => submitQuizFinal(quizAnswers)} className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50">
+                              {loadingQuiz ? t('loading') : t('quiz_finish')}
+                            </button>
+                          )
+                        ) : (
+                          <span className="text-sm opacity-70">{t('quiz_adaptive_answer_first')}</span>
+                        )
+                      ) : currentQuestionIndex < quizQuestions.length - 1 && !quizTimeExpired ? (
                         <button
                           type="button"
                           disabled={quizTimeExpired || loadingQuiz}
