@@ -89,6 +89,7 @@ export default function App() {
   const [quizResult, setQuizResult] = useState(null)
   const [loadingQuiz, setLoadingQuiz] = useState(false)
   const [quizType, setQuizType] = useState('vocabulary')
+  const [quizLevel, setQuizLevel] = useState('B1')
   
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('english-learning-theme') === 'dark')
   
@@ -273,6 +274,8 @@ export default function App() {
 
   const startQuiz = async (type = 'vocabulary') => {
     setQuizType(type)
+    const level = preferences.preferred_level || 'B1'
+    setQuizLevel(level)
     setLoadingQuiz(true)
     setQuizSubmitted(false)
     setQuizResult(null)
@@ -280,7 +283,7 @@ export default function App() {
     setQuizAnswers({})
 
     try {
-      const res = await apiFetch(apiUrl(`/quiz/api/questions/?type=${type}`))
+      const res = await apiFetch(apiUrl(`/quiz/api/questions/?type=${type}&level=${level}`))
       const data = await res.json()
       if (res.ok) {
         setQuizQuestions(Array.isArray(data) ? data : [])
@@ -314,6 +317,7 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify({
           quiz_type: quizType,
+          level: quizLevel,
           answers: finalAnswers
         })
       });
@@ -959,7 +963,7 @@ export default function App() {
                     <h4 className="font-bold">{t('quiz_history')}</h4>
                     {quizHistory.slice(0, 5).map((session) => (
                       <div key={session.id} className="flex items-center justify-between gap-4 border-b last:border-0 border-gray-200 dark:border-gray-700 py-2 text-sm">
-                        <span>{t(`quiz_${session.quiz_type}`)} · {new Date(session.created_at).toLocaleDateString(i18n.language === 'fa' ? 'fa-IR' : 'en-US')}</span>
+                        <span>{t(`quiz_${session.quiz_type}`)} · {session.level || 'B1'} · {new Date(session.created_at).toLocaleDateString(i18n.language === 'fa' ? 'fa-IR' : 'en-US')}</span>
                         <span className="font-bold text-indigo-500">{session.score}/{session.total_questions} ({session.percentage}%)</span>
                       </div>
                     ))}
