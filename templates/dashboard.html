@@ -1,54 +1,50 @@
 {% extends 'base.html' %}
+{% block title %}Dashboard · English Studio{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-12">
-        <h2 class="fw-bold">My Learning Dashboard</h2>
-        <p class="text-muted">Track your progress and access your AI modules.</p>
+<section class="writing-hero rounded-4 p-4 p-lg-5 mb-4">
+    <span class="eyebrow">YOUR LEARNING SPACE</span>
+    <div class="row align-items-end g-3 mt-1">
+        <div class="col-lg-8">
+            <h1 class="display-6 fw-bold mb-3">A little practice goes a long way.</h1>
+            <p class="lead mb-0">Welcome back, {{ user.first_name|default:user.username }}. Pick up where you left off and keep building your English, one sentence at a time.</p>
+        </div>
+        <div class="col-lg-4 text-lg-end">
+            <a href="{% url 'writing_submit' %}" class="btn btn-light btn-lg">Open writing studio <span aria-hidden="true">→</span></a>
+        </div>
     </div>
-</div>
+</section>
 
 <div class="row g-4">
-    <!-- Writing Module -->
     <div class="col-md-4">
-        <div class="card h-100 border-0 shadow-sm custom-card">
-            <div class="card-body">
-                <h5 class="card-title text-primary fw-bold">Writing Practice</h5>
-                <p class="card-text">Get instant AI feedback on your grammar, spelling, and structure using our advanced RAG system.</p>
+        <article class="surface-card custom-card h-100 p-4">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <span class="soft-pill">01 · WRITE</span><span class="fs-3" aria-hidden="true">✎</span>
             </div>
-            <div class="card-footer bg-white border-0 pb-3">
-                <a href="{% url 'writing_submit' %}" class="btn btn-primary w-100">Start Writing</a>
-            </div>
-        </div>
+            <h2 class="h4 fw-bold">Writing studio</h2>
+            <p class="text-secondary">Practice expressing your ideas and keep a private journal of your writing submissions.</p>
+            <div class="mt-auto pt-2"><a href="{% url 'writing_submit' %}" class="btn btn-primary w-100">Start writing</a></div>
+        </article>
     </div>
-
-    <!-- Vocabulary Module -->
     <div class="col-md-4">
-        <div class="card h-100 border-0 shadow-sm custom-card">
-            <div class="card-body">
-                <h5 class="card-title text-success fw-bold">Vocabulary Bank</h5>
-                <p class="card-text">Learn new words tailored to your level. You currently have access to <strong>{{ word_count }}</strong> curated words.</p>
-                <div class="progress mt-3" style="height: 10px;">
-                    <div class="progress-bar bg-success" role="progressbar" style="width: 25%" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
-                </div>
+        <article class="surface-card custom-card h-100 p-4">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <span class="soft-pill">02 · VOCABULARY</span><span class="fs-3" aria-hidden="true">Aa</span>
             </div>
-            <div class="card-footer bg-white border-0 pb-3">
-                <button class="btn btn-success w-100" disabled>Coming Soon</button>
-            </div>
-        </div>
+            <h2 class="h4 fw-bold">Vocabulary bank</h2>
+            <p class="text-secondary">The project contains {{ word_count }} vocabulary entries. A dedicated learning and progress interface is still being developed.</p>
+            <div class="notice-panel mt-auto">Learning interface not available yet</div>
+        </article>
     </div>
-
-    <!-- Reading Module -->
     <div class="col-md-4">
-        <div class="card h-100 border-0 shadow-sm custom-card">
-            <div class="card-body">
-                <h5 class="card-title text-info fw-bold">Reading Comprehension</h5>
-                <p class="card-text">Read graded articles and answer questions. There are <strong>{{ article_count }}</strong> articles ready for you.</p>
+        <article class="surface-card custom-card h-100 p-4">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <span class="soft-pill">03 · READING</span><span class="fs-3" aria-hidden="true">▤</span>
             </div>
-            <div class="card-footer bg-white border-0 pb-3">
-                <button class="btn btn-info text-white w-100" disabled>Coming Soon</button>
-            </div>
-        </div>
+            <h2 class="h4 fw-bold">Reading practice</h2>
+            <p class="text-secondary">There are {{ article_count }} reading entries in the project. Reading exercises and progress tracking are not available in the interface yet.</p>
+            <div class="notice-panel mt-auto">Learning interface not available yet</div>
+        </article>
     </div>
 </div>
 {% endblock %}
