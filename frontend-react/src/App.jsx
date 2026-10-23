@@ -63,6 +63,7 @@ export default function App() {
   const [writings, setWritings] = useState([])
   const [personalWords, setPersonalWords] = useState([])
   const [reviewQueue, setReviewQueue] = useState([])
+  const [dueReviewCount, setDueReviewCount] = useState(0)
   const [activeReviewWord, setActiveReviewWord] = useState(null)
   const [reviewAnswerVisible, setReviewAnswerVisible] = useState(false)
   const [reviewBusy, setReviewBusy] = useState(false)
@@ -226,7 +227,8 @@ export default function App() {
           setReadingProgress(Array.isArray(progressData) ? progressData : [])
           setQuizHistory(Array.isArray(historyData) ? historyData : [])
           if (statsRes.ok) setQuizStats(statsData)
-          setReviewQueue(reviewRes.ok && Array.isArray(reviewData) ? reviewData : [])
+          setReviewQueue(reviewRes.ok && Array.isArray(reviewData.results) ? reviewData.results : [])
+          setDueReviewCount(reviewRes.ok ? Number(reviewData.count) || 0 : 0)
         } else if (activeTab === 'reading') {
           const [articlesRes, progressRes] = await Promise.all([
             apiFetch(apiUrl('/reading/api/articles/')),
@@ -246,7 +248,8 @@ export default function App() {
           ])
           setWords(Array.isArray(wordsData) ? wordsData : [])
           setPersonalWords(Array.isArray(personalData) ? personalData : [])
-          setReviewQueue(reviewRes.ok && Array.isArray(reviewData) ? reviewData : [])
+          setReviewQueue(reviewRes.ok && Array.isArray(reviewData.results) ? reviewData.results : [])
+          setDueReviewCount(reviewRes.ok ? Number(reviewData.count) || 0 : 0)
           setActiveReviewWord(null)
           setReviewAnswerVisible(false)
         } else if (activeTab === 'writing') {
@@ -429,9 +432,10 @@ export default function App() {
     try {
       const res = await apiFetch(apiUrl('/vocabulary/api/review/queue/'))
       const data = await res.json()
-      if (res.ok && Array.isArray(data)) {
-        setReviewQueue(data)
-        return data
+      if (res.ok && Array.isArray(data.results)) {
+        setReviewQueue(data.results)
+        setDueReviewCount(Number(data.count) || 0)
+        return data.results
       }
       return []
     } catch (err) {
@@ -462,8 +466,11 @@ export default function App() {
       }
 
       setPersonalWords((current) => current.map((item) => item.id === data.id ? data : item))
-      const remaining = reviewQueue.filter((item) => item.id !== data.id)
+      const queueRes = await apiFetch(apiUrl('/vocabulary/api/review/queue/'))
+      const queueData = await queueRes.json()
+      const remaining = queueRes.ok && Array.isArray(queueData.results) ? queueData.results : []
       setReviewQueue(remaining)
+      setDueReviewCount(queueRes.ok ? Number(queueData.count) || 0 : remaining.length)
       setActiveReviewWord(remaining[0] || null)
       setReviewAnswerVisible(false)
     } catch (err) {
@@ -669,7 +676,7 @@ export default function App() {
                 <div className={`p-5 rounded-2xl border flex flex-wrap items-center justify-between gap-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                   <div>
                     <h3 className="text-lg font-extrabold">{t('spaced_review')}</h3>
-                    <p className={`text-sm mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('due_count', { count: reviewQueue.length })}</p>
+                    <p className={`text-sm mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('due_count', { count: dueReviewCount })}</p>
                   </div>
                   <button type="button" onClick={() => changeTab('vocabulary')} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2">{t('open_review')}</button>
                 </div>
@@ -788,9 +795,9 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{reviewQueue.length ? t('due_words_ready') : t('review_complete')}</p>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{dueReviewCount > 0 ? t('due_words_ready') : t('review_complete')}</p>
                       <button type="button" disabled={reviewBusy} onClick={beginDailyReview} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 disabled:opacity-50">
-                        {reviewQueue.length ? t('start_review') : t('refresh_review_queue')}
+                        {dueReviewCount > 0 ? t('start_review') : t('refresh_review_queue')}
                       </button>
                     </div>
                   )}
