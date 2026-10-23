@@ -2,14 +2,25 @@ import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts'
 
-function calculateCurrentStreak() {
-  const today = new Date().toDateString()
-  const lastLogin = localStorage.getItem('last_login_date')
-  const storedStreak = Number.parseInt(localStorage.getItem('user_streak') || '0', 10)
-  if (lastLogin === today) return storedStreak
-  const yesterday = new Date()
-  yesterday.setDate(yesterday.getDate() - 1)
-  return lastLogin === yesterday.toDateString() ? storedStreak + 1 : 1
+// Set VITE_API_BASE_URL when the frontend and API are deployed on different origins.
+// In production, an empty base uses same-origin routes; local development targets Django.
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '')).replace(/\/$/, '')
+const apiUrl = (path) => `${API_BASE}${path}`
+
+function calculateCurrentStreak(sessions = []) {
+  // Count real quiz activity, not page visits or values stored in the browser.
+  const dateKey = (date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+  const activeDays = new Set(sessions.map((session) => dateKey(new Date(session.created_at))))
+  const start = new Date()
+  if (!activeDays.has(dateKey(start))) start.setDate(start.getDate() - 1)
+  if (!activeDays.has(dateKey(start))) return 0
+
+  let streak = 0
+  while (activeDays.has(dateKey(start))) {
+    streak += 1
+    start.setDate(start.getDate() - 1)
+  }
+  return streak
 }
 
 async function apiFetch(url, options = {}) {
@@ -92,7 +103,7 @@ export default function App() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
 
-  const [streak] = useState(calculateCurrentStreak)
+  const streak = useMemo(() => calculateCurrentStreak(quizHistory), [quizHistory])
   const chartData = useMemo(() => {
     const daysFa = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه']
     const daysEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -287,15 +298,6 @@ export default function App() {
       setLoadingQuiz(false);
     }
   };
-
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    const today = new Date().toDateString();
-    if (localStorage.getItem('last_login_date') !== today) {
-      localStorage.setItem('last_login_date', today);
-      localStorage.setItem('user_streak', String(streak));
-    }
-  }, [isLoggedIn, streak]);
 
   const handleWordClick = async (word) => {
     const cleanedWord = word.replace(/^[^a-zA-Z'-]+|[^a-zA-Z'-]+$/g, '').toLowerCase()
