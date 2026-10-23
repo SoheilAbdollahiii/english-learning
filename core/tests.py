@@ -102,3 +102,47 @@ class LearnerRegistrationTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 400)
+
+
+class AccountDeletionTests(TestCase):
+    def setUp(self):
+        from rest_framework.test import APIClient
+        self.api = APIClient()
+        self.user = User.objects.create_user(username="delete-me", password="Strong-test-pass-123")
+        self.api.force_authenticate(user=self.user)
+
+    def test_account_deletion_requires_exact_confirmation_and_current_password(self):
+        response = self.api.delete(
+            reverse("delete_account"),
+            {"confirmation": "DELETE", "password": "incorrect-password"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
+
+        missing_confirmation = self.api.delete(
+            reverse("delete_account"),
+            {"confirmation": "delete", "password": "Strong-test-pass-123"},
+            format="json",
+        )
+        self.assertEqual(missing_confirmation.status_code, 400)
+        self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
+
+    def test_account_deletion_removes_owned_words_but_not_other_users(self):
+        from vocabulary.models import UserWord
+
+        UserWord.objects.create(user=self.user, english_word="private-word")
+        other = User.objects.create_user(username="keep-me", password="Strong-test-pass-123")
+        other_word = UserWord.objects.create(user=other, english_word="other-private-word")
+        user_id = self.user.pk
+
+        response = self.api.delete(
+            reverse("delete_account"),
+            {"confirmation": "DELETE", "password": "Strong-test-pass-123"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(User.objects.filter(pk=user_id).exists())
+        self.assertFalse(UserWord.objects.filter(user_id=user_id).exists())
+        self.assertTrue(User.objects.filter(pk=other.pk).exists())
+        self.assertTrue(UserWord.objects.filter(pk=other_word.pk).exists())
