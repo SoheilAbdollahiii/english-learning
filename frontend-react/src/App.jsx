@@ -944,6 +944,7 @@ export default function App() {
                     <p className="text-gray-500 text-sm">
                       {t('quiz_intro')}
                     </p>
+                    <p className="text-xs font-bold text-indigo-500">{t('preferred_level')}: {preferences.preferred_level || 'B1'}</p>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {[
                         ['vocabulary', 'quiz_vocabulary'],
