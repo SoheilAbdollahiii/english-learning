@@ -11,6 +11,8 @@ class CorePageRoutingTests(TestCase):
         response = self.client.get(reverse("home"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Build confidence.")
+        self.assertContains(response, "Start learning")
+        self.assertContains(response, "Save useful words")
 
     def test_login_page_renders_accessible_form(self):
         response = self.client.get(reverse("login"))
@@ -32,6 +34,8 @@ class CorePageRoutingTests(TestCase):
 
         self.assertEqual(dashboard.status_code, 200)
         self.assertContains(dashboard, "Writing studio")
+        self.assertContains(dashboard, "Open vocabulary")
+        self.assertContains(dashboard, "Open reading")
         self.assertEqual(writing.status_code, 200)
         self.assertContains(writing, "Make space for better English.")
 
