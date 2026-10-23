@@ -386,6 +386,8 @@ class DailyChallengeGamificationTests(TestCase):
         self.assertEqual(first.data["date"], timezone.localdate().isoformat())
         self.assertEqual(first.data["question_count"], 10)
         self.assertEqual(first.data["duration_seconds"], 300)
+        self.assertGreaterEqual(first.data["remaining_seconds"], 0)
+        self.assertLessEqual(first.data["remaining_seconds"], 300)
         self.assertEqual(
             [question["id"] for question in first.data["questions"]],
             [question["id"] for question in second.data["questions"]],
