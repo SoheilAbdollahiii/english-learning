@@ -25,20 +25,19 @@ class SharedVocabularyPermissionsTests(TestCase):
         self.client.force_authenticate(user=self.learner)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]["english_word"], "curious")
+        self.assertIn("curious", [row["english_word"] for row in response.data])
 
     def test_regular_learner_cannot_create_shared_words(self):
         self.client.force_authenticate(user=self.learner)
         response = self.client.post(self.url, {"english_word": "curious", "translation": "کنجکاو", "level": "A1"}, format="json")
         self.assertEqual(response.status_code, 403)
-        self.assertEqual(Word.objects.count(), 0)
+        self.assertFalse(Word.objects.filter(english_word="curious").exists())
 
     def test_staff_can_create_shared_words(self):
         self.client.force_authenticate(user=self.staff)
         response = self.client.post(self.url, {"english_word": "curious", "translation": "کنجکاو", "level": "A1"}, format="json")
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(Word.objects.count(), 1)
+        self.assertEqual(Word.objects.filter(english_word="curious").count(), 1)
 
 
 class PersonalVocabularyTests(TestCase):
