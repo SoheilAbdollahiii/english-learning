@@ -42,6 +42,7 @@ export default function App() {
   const [quizType, setQuizType] = useState('vocabulary')
   const [quizLevel, setQuizLevel] = useState('B1')
   const [quizQuestionCount, setQuizQuestionCount] = useState(5)
+  const [quizCustomQuestionCount, setQuizCustomQuestionCount] = useState(10)
   const [quizDifficulty, setQuizDifficulty] = useState('all')
   const [quizShuffle, setQuizShuffle] = useState(true)
   const [quizAnswerMode, setQuizAnswerMode] = useState('end')
@@ -263,7 +264,7 @@ export default function App() {
   const startQuiz = async (type = 'vocabulary') => {
     setQuizType(type)
     const level = quizLevel || preferences.preferred_level || 'B1'
-    const count = quizQuestionCount
+    const count = quizQuestionCount === 0 ? quizCustomQuestionCount : quizQuestionCount
     setQuizQuestions([])
     setQuizTimeLeft(quizTotalDuration)
     setQuizQuestionTimeLeft(quizPerQuestionDuration)
@@ -989,8 +990,15 @@ export default function App() {
                         <span>{t('quiz_count_setting')}</span>
                         <select value={quizQuestionCount} onChange={(event) => setQuizQuestionCount(Number(event.target.value))} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
                           {[5, 10, 15, 20, 30].map((count) => <option key={count} value={count}>{count}</option>)}
+                          <option value={0}>{t('custom_count')}</option>
                         </select>
                       </label>
+                      {quizQuestionCount === 0 && (
+                        <label className="space-y-2 text-sm font-semibold">
+                          <span>{t('custom_count')} (1–30)</span>
+                          <input type="number" min="1" max="30" value={quizCustomQuestionCount} onChange={(event) => setQuizCustomQuestionCount(Math.min(30, Math.max(1, Number(event.target.value) || 1)))} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`} />
+                        </label>
+                      )}
                       <label className="space-y-2 text-sm font-semibold">
                         <span>{t('quiz_difficulty_setting')}</span>
                         <select value={quizDifficulty} onChange={(event) => setQuizDifficulty(event.target.value)} disabled={loadingQuiz} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
@@ -1227,6 +1235,8 @@ export default function App() {
                           setCurrentQuestionIndex(0)
                           setQuizAnswers({})
                           setQuizError('')
+                          setQuizNotice('')
+                          setQuizImmediateFeedback({})
                           setQuizTimeExpired(false)
                           setQuizTimeLeft(quizTotalDuration)
                         }}
