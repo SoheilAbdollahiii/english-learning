@@ -127,12 +127,18 @@ def review_queue(request):
     })
 
 
-def _record_review(word, remembered):
+def _record_review(word, quality):
+    """Record recall quality and schedule a spaced review."""
+    if isinstance(quality, bool):
+        quality = "easy" if quality else "forgot"
+    if quality not in {"easy", "hard", "forgot"}:
+        raise ValueError("Unsupported review quality.")
+
     now = timezone.now()
     word.last_reviewed_at = now
     word.review_count += 1
 
-    if remembered:
+    if quality == "easy":
         word.correct_count += 1
         interval = word.review_interval_days
         if interval < 1:
@@ -146,6 +152,12 @@ def _record_review(word, remembered):
         word.review_interval_days = interval
         word.next_review_at = now + timedelta(days=interval)
         word.proficiency = min(100, word.proficiency + 10)
+    elif quality == "hard":
+        word.correct_count += 1
+        interval = max(1, min(word.review_interval_days or 1, 3))
+        word.review_interval_days = interval
+        word.next_review_at = now + timedelta(days=interval)
+        word.proficiency = min(100, word.proficiency + 3)
     else:
         word.incorrect_count += 1
         word.review_interval_days = 0
@@ -158,7 +170,6 @@ def _record_review(word, remembered):
     ])
     return word
 
-
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def review_word(request, word_id):
@@ -168,12 +179,20 @@ def review_word(request, word_id):
     except UserWord.DoesNotExist:
         return Response({"detail": "Saved word not found."}, status=status.HTTP_404_NOT_FOUND)
 
-    remembered = request.data.get("remembered")
-    if not isinstance(remembered, bool):
+    quality = request.data.get("quality")
+    if quality is None:
+        remembered = request.data.get("remembered")
+        if not isinstance(remembered, bool):
+            return Response(
+                {"quality": "Choose easy, hard, or forgot."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        quality = "easy" if remembered else "forgot"
+    if not isinstance(quality, str) or quality not in {"easy", "hard", "forgot"}:
         return Response(
-            {"remembered": "Expected true or false."},
+            {"quality": "Choose easy, hard, or forgot."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    _record_review(word, remembered)
+    _record_review(word, quality)
     return Response(UserWordSerializer(word).data)
