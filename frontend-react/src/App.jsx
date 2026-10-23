@@ -247,7 +247,6 @@ export default function App() {
           ])
           setWords(Array.isArray(wordsData) ? wordsData : [])
           setPersonalWords(Array.isArray(personalData) ? personalData : [])
-          setReviewQueue(reviewRes.ok && Array.isArray(reviewData.results) ? reviewData.results : [])
           setDueReviewCount(reviewRes.ok ? Number(reviewData.count) || 0 : 0)
           setActiveReviewWord(null)
           setReviewAnswerVisible(false)
