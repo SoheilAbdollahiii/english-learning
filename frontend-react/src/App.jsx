@@ -352,6 +352,7 @@ export default function App() {
   }
 
   const startQuiz = async (type = 'vocabulary') => {
+    setDailyChallengeMode(false)
     setQuizType(type)
     const level = quizLevel || preferences.preferred_level || 'B1'
     const count = quizQuestionCount === 0 ? quizCustomQuestionCount : quizQuestionCount
