@@ -66,6 +66,17 @@ class LearnerRegistrationTests(TestCase):
         user = User.objects.get(username="new-learner")
         self.assertTrue(user.check_password("Better-password-Unique-984!x"))
 
+    def test_password_login_issues_tokens_through_rate_limited_endpoint(self):
+        User.objects.create_user(username="existing-learner", password="Strong-test-pass-123")
+        response = self.api.post(
+            reverse("token_obtain_pair"),
+            {"username": "existing-learner", "password": "Strong-test-pass-123"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("access", response.data)
+        self.assertIn("refresh", response.data)
+
     def test_registration_rejects_mismatched_passwords(self):
         response = self.api.post(
             reverse("register_learner"),
