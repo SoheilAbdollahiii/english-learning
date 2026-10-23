@@ -98,6 +98,21 @@ class LearningQuizTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(QuizSession.objects.count(), 0)
 
+    def test_submitting_more_than_five_answers_is_rejected(self):
+        questions = Question.objects.filter(quiz_type="grammar", level="A1").order_by("id")[:6]
+        self.assertEqual(len(questions), 6)
+        answers = {str(question.id): question.correct_option for question in questions}
+
+        response = self.client.post(
+            reverse("quiz_submit"),
+            {"quiz_type": "grammar", "level": "A1", "answers": answers},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("no more than five", response.data["answers"])
+        self.assertEqual(QuizSession.objects.count(), 0)
+
     def test_empty_answers_are_rejected(self):
         response = self.client.post(reverse("quiz_submit"), {"quiz_type": "reading", "answers": {}}, format="json")
         self.assertEqual(response.status_code, 400)
