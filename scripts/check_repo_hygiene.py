@@ -6,7 +6,7 @@ import sys
 
 tracked = subprocess.run(
     ["git", "ls-files", "-z"], check=True, capture_output=True
-).stdout.decode().split("\\0")
+).stdout.decode().split("\0")
 violations = []
 
 for name in filter(None, tracked):
@@ -23,7 +23,7 @@ for name in filter(None, tracked):
 
 if violations:
     print("Repository hygiene check failed:", file=sys.stderr)
-    print("\\n".join(f" - {item}" for item in violations), file=sys.stderr)
+    print("\n".join(f" - {item}" for item in violations), file=sys.stderr)
     sys.exit(1)
 
 print(f"Repository hygiene check passed ({len(list(filter(None, tracked)))} tracked paths).")
