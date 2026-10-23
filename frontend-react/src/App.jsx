@@ -62,6 +62,10 @@ export default function App() {
   const [articles, setArticles] = useState([])
   const [writings, setWritings] = useState([])
   const [personalWords, setPersonalWords] = useState([])
+  const [reviewQueue, setReviewQueue] = useState([])
+  const [activeReviewWord, setActiveReviewWord] = useState(null)
+  const [reviewAnswerVisible, setReviewAnswerVisible] = useState(false)
+  const [reviewBusy, setReviewBusy] = useState(false)
   const [readingProgress, setReadingProgress] = useState([])
   const [quizHistory, setQuizHistory] = useState([])
   const [quizStats, setQuizStats] = useState({ current_streak: 0, quiz_sessions_total: 0, daily_activity: [] })
@@ -230,13 +234,19 @@ export default function App() {
           setArticles(Array.isArray(articlesData) ? articlesData : [])
           setReadingProgress(Array.isArray(progressData) ? progressData : [])
         } else if (activeTab === 'vocabulary') {
-          const [wordsRes, personalRes] = await Promise.all([
+          const [wordsRes, personalRes, reviewRes] = await Promise.all([
             apiFetch(apiUrl('/vocabulary/api/words/')),
-            apiFetch(apiUrl('/vocabulary/api/my-words/'))
+            apiFetch(apiUrl('/vocabulary/api/my-words/')),
+            apiFetch(apiUrl('/vocabulary/api/review/queue/'))
           ])
-          const [wordsData, personalData] = await Promise.all([wordsRes.json(), personalRes.json()])
+          const [wordsData, personalData, reviewData] = await Promise.all([
+            wordsRes.json(), personalRes.json(), reviewRes.json()
+          ])
           setWords(Array.isArray(wordsData) ? wordsData : [])
           setPersonalWords(Array.isArray(personalData) ? personalData : [])
+          setReviewQueue(reviewRes.ok && Array.isArray(reviewData) ? reviewData : [])
+          setActiveReviewWord(null)
+          setReviewAnswerVisible(false)
         } else if (activeTab === 'writing') {
           const res = await apiFetch(apiUrl('/writing/api/writings/'))
           const data = await res.json()
@@ -404,16 +414,59 @@ export default function App() {
     }
   }
 
-  const practiceWord = async (word) => {
-    if (!word.isPersonal) return
+  const startWordReview = (word) => {
+    if (!word?.id) return
+    setActiveReviewWord(word)
+    setReviewAnswerVisible(false)
+  }
+
+  const loadReviewQueue = async () => {
+    setReviewBusy(true)
     try {
-      const res = await apiFetch(apiUrl(`/vocabulary/api/my-words/${word.id}/practice/`), { method: 'POST' })
+      const res = await apiFetch(apiUrl('/vocabulary/api/review/queue/'))
       const data = await res.json()
-      if (res.ok) {
-        setPersonalWords((current) => current.map((item) => item.id === data.id ? data : item))
+      if (res.ok && Array.isArray(data)) {
+        setReviewQueue(data)
+        return data
       }
+      return []
     } catch (err) {
-      console.error('Could not update word mastery:', err)
+      console.error('Could not load due vocabulary reviews:', err)
+      return []
+    } finally {
+      setReviewBusy(false)
+    }
+  }
+
+  const beginDailyReview = async () => {
+    const dueWords = await loadReviewQueue()
+    if (dueWords.length > 0) startWordReview(dueWords[0])
+  }
+
+  const submitWordReview = async (remembered) => {
+    if (!activeReviewWord) return
+    setReviewBusy(true)
+    try {
+      const res = await apiFetch(apiUrl(`/vocabulary/api/my-words/${activeReviewWord.id}/review/`), {
+        method: 'POST',
+        body: JSON.stringify({ remembered })
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(data.detail || t('review_failed'))
+        return
+      }
+
+      setPersonalWords((current) => current.map((item) => item.id === data.id ? data : item))
+      const remaining = reviewQueue.filter((item) => item.id !== data.id)
+      setReviewQueue(remaining)
+      setActiveReviewWord(remaining[0] || null)
+      setReviewAnswerVisible(false)
+    } catch (err) {
+      console.error('Could not save vocabulary review:', err)
+      alert(t('review_failed'))
+    } finally {
+      setReviewBusy(false)
     }
   }
 
