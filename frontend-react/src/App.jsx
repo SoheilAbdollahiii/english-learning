@@ -948,13 +948,15 @@ function InteractiveText({ text, onWordClick, darkMode }) {
         const cleanWord = word.replace(/[.,!?]/g, ''); 
         return (
           <span key={index}>
-            <span
+            <button
+              type="button"
               onClick={() => onWordClick(cleanWord)}
-              className={`cursor-pointer transition-colors rounded px-0.5 ${darkMode ? 'hover:bg-indigo-950 hover:text-indigo-300' : 'hover:bg-indigo-100 hover:text-indigo-800'}`}
+              className={`cursor-pointer transition-colors rounded px-0.5 bg-transparent border-0 p-0 align-baseline ${darkMode ? 'hover:bg-indigo-950 hover:text-indigo-300' : 'hover:bg-indigo-100 hover:text-indigo-800'}`}
               title="Add to Vocabulary"
+              aria-label={`Save word ${cleanWord}`}
             >
               {word}
-            </span>
+            </button>
             {' '}
           </span>
         );
