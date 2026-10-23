@@ -182,7 +182,11 @@ export default function App() {
           setPersonalWords(Array.isArray(personalData) ? personalData : [])
           setArticles(Array.isArray(articlesData) ? articlesData : [])
           setWritings(Array.isArray(writingsData) ? writingsData : [])
-          if (preferencesRes.ok) setPreferences(preferencesData)
+          if (preferencesRes.ok) {
+            setPreferences(preferencesData)
+            setReadingLevel(preferencesData.preferred_level)
+            setVocabLevel(preferencesData.preferred_level)
+          }
           setReadingProgress(Array.isArray(progressData) ? progressData : [])
           setQuizHistory(Array.isArray(historyData) ? historyData : [])
         } else if (activeTab === 'reading') {
@@ -325,6 +329,8 @@ export default function App() {
       const data = await res.json()
       if (res.ok) {
         setPreferences(data)
+        setReadingLevel(data.preferred_level)
+        setVocabLevel(data.preferred_level)
         alert(t('preferences_saved'))
       } else {
         alert(t('preferences_failed'))
@@ -405,6 +411,9 @@ export default function App() {
       console.error('Could not delete saved word:', err)
     }
   };
+
+  const dailyWordsAdded = personalWords.filter((word) => new Date(word.created_at).toDateString() === new Date().toDateString()).length
+  const dailyGoalPercent = Math.min(100, Math.round((dailyWordsAdded / Math.max(1, Number(preferences.daily_word_goal) || 1)) * 100))
 
   const filteredArticles = articles.filter((article) => {
     const matchesQuery = `${article.title} ${article.content}`.toLowerCase().includes(readingQuery.trim().toLowerCase())
@@ -545,7 +554,7 @@ export default function App() {
           <>
             {activeTab === 'dashboard' && (
               <div className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
                   <div className={`p-6 rounded-2xl shadow-sm border flex flex-col justify-center items-center transition-shadow ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                     <h3 className="text-gray-400 font-bold mb-2">{t('vocab_title')}</h3>
                     <p className="text-5xl font-black text-indigo-500">{personalWords.length}</p>
@@ -557,6 +566,14 @@ export default function App() {
                   <div className={`p-6 rounded-2xl shadow-sm border flex flex-col justify-center items-center transition-shadow ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                     <h3 className="text-gray-400 font-bold mb-2">{t('daily_streak')}</h3>
                     <p className="text-5xl font-black text-orange-500">{streak} ⚡</p>
+                  </div>
+                  <div className={`p-6 rounded-2xl shadow-sm border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                    <h3 className="text-gray-400 font-bold mb-3">{t('daily_goal_progress')}</h3>
+                    <p className="text-2xl font-black text-indigo-500">{dailyWordsAdded} / {preferences.daily_word_goal}</p>
+                    <div className={`w-full rounded-full h-2.5 mt-4 overflow-hidden ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                      <div className="bg-indigo-600 h-2.5 rounded-full transition-all" style={{ width: `${dailyGoalPercent}%` }}></div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">{t('words_added_today')}</p>
                   </div>
                 </div>
 
