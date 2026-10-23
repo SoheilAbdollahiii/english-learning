@@ -34,7 +34,7 @@ The React login screen supports self-service registration. `POST /api/register/`
 - `GET|POST /reading/api/progress/` — read or update per-user article progress
 - `GET|PATCH /learning/api/preferences/` — retrieve or update personal learning settings
 - `GET /quiz/api/questions/?type=vocabulary|reading|grammar` — fetch a quiz (answers are not exposed)
-- `POST /quiz/api/submit/` and `GET /quiz/api/history/` — submit answers and view the current user's recent results
+- `POST /quiz/api/submit/`, `GET /quiz/api/history/`, and `GET /quiz/api/stats/` — submit answers, view recent results, and retrieve per-user streak plus seven-day quiz activity
 - `POST /api/register/` — create a learner account with validated password and receive JWT tokens
 
 Run `python manage.py migrate` after pulling the changes so the personal data tables and starter quiz questions are created. The new endpoints require the same JWT login used by the React client.
