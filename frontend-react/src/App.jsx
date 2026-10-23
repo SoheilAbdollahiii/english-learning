@@ -1179,7 +1179,7 @@ export default function App() {
                           if (!items.length) return null
                           return <section key={key} className="space-y-2">
                             <h3 className="font-extrabold">{t(key === 'synonyms' ? 'word_synonyms' : key === 'antonyms' ? 'word_antonyms' : 'word_collocations')}</h3>
-                            <div className="flex flex-wrap gap-2">{items.map((item) => <button key={item} type="button" onClick={() => handleWordClick(item, readingLookup.sentence)} className={`rounded-full border px-3 py-2 text-sm font-semibold transition hover:border-indigo-500 ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`} dir="ltr">{item}</button>)}</div>
+                            <div className="flex flex-wrap gap-2">{items.map((item) => <button key={item} type="button" onClick={() => handleWordClick(item)} className={`rounded-full border px-3 py-2 text-sm font-semibold transition hover:border-indigo-500 ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`} dir="ltr">{item}</button>)}</div>
                           </section>
                         })}
                         <section className="space-y-2">
