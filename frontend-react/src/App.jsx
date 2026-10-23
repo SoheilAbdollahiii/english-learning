@@ -239,6 +239,10 @@ export default function App() {
     setQuizType(type)
     const level = preferences.preferred_level || 'B1'
     setQuizLevel(level)
+    setQuizQuestions([])
+    setQuizTimeLeft(90)
+    setQuizTimeExpired(false)
+    setQuizError('')
     setLoadingQuiz(true)
     setQuizSubmitted(false)
     setQuizResult(null)
@@ -1030,7 +1034,7 @@ export default function App() {
                       >
                         {t('quiz_previous_question')}
                       </button>
-                      {currentQuestionIndex < quizQuestions.length - 1 ? (
+                      {currentQuestionIndex < quizQuestions.length - 1 && !quizTimeExpired ? (
                         <button
                           type="button"
                           disabled={quizTimeExpired || loadingQuiz}
