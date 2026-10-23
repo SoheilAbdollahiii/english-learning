@@ -53,6 +53,7 @@ export default function App() {
   const [quizTimeLeft, setQuizTimeLeft] = useState(300)
   const [quizTimeExpired, setQuizTimeExpired] = useState(false)
   const [quizError, setQuizError] = useState('')
+  const [quizNotice, setQuizNotice] = useState('')
   
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('english-learning-theme') === 'dark')
   
@@ -269,6 +270,7 @@ export default function App() {
     setQuizImmediateFeedback({})
     setQuizTimeExpired(false)
     setQuizError('')
+    setQuizNotice('')
     setLoadingQuiz(true)
     setQuizSubmitted(false)
     setQuizResult(null)
@@ -279,7 +281,9 @@ export default function App() {
       const res = await apiFetch(apiUrl(`/quiz/api/questions/?type=${type}&level=${level}&count=${count}&difficulty=${quizDifficulty}&shuffle=${quizShuffle}`))
       const data = await res.json()
       if (res.ok) {
-        setQuizQuestions(Array.isArray(data) ? data : [])
+        const loadedQuestions = Array.isArray(data) ? data : []
+        setQuizQuestions(loadedQuestions)
+        if (loadedQuestions.length < count) setQuizNotice(t('quiz_fewer_questions', { requested: count, available: loadedQuestions.length }))
       } else {
         setQuizQuestions([])
         alert(data.detail || t('quiz_load_failed'))
@@ -1052,8 +1056,9 @@ export default function App() {
                     <div className="flex flex-wrap justify-between items-center gap-3 text-xs font-bold text-gray-400">
                       <span>{t('question_counter', { current: currentQuestionIndex + 1, total: quizQuestions.length })}</span>
                       <span className="rounded-lg bg-indigo-50 dark:bg-indigo-950 px-3 py-1 text-indigo-600 dark:text-indigo-300">{quizQuestions[currentQuestionIndex].level}</span>
+                      <span className="rounded-lg bg-violet-50 dark:bg-violet-950 px-3 py-1 text-violet-600 dark:text-violet-300">{t(`difficulty_${quizQuestions[currentQuestionIndex].difficulty || 'medium'}`)}</span>
                       {quizTimerMode !== 'none' && (
-                        <span role="timer" aria-live="off" className={`rounded-lg px-3 py-1 tabular-nums ${quizTimeLeft <= 15 || quizTimeExpired ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'}`}>
+                        <span role="timer" aria-live="off" className={`rounded-lg px-3 py-1 tabular-nums ${(quizTimerMode === 'total' ? quizTimeLeft : quizQuestionTimeLeft) <= 15 || quizTimeExpired ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'}`}>
                           ⏱ {Math.floor((quizTimerMode === 'total' ? quizTimeLeft : quizQuestionTimeLeft) / 60).toString().padStart(2, '0')}:{((quizTimerMode === 'total' ? quizTimeLeft : quizQuestionTimeLeft) % 60).toString().padStart(2, '0')}
                         </span>
                       )}
@@ -1114,6 +1119,10 @@ export default function App() {
                           </button>
                         )}
                       </div>
+                    )}
+
+                    {quizNotice && (
+                      <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">{quizNotice}</p>
                     )}
 
                     {quizError && (
