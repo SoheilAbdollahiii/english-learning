@@ -20,6 +20,10 @@ An English-learning application with a Django REST API, a React learning interfa
 - **Skill quizzes:** Separate vocabulary, reading, and grammar quizzes are seeded by a data migration. Results include explanations and are saved to a private per-user history.
 - **Progress data:** The dashboard chart is based on saved quiz sessions, not a fabricated activity curve.
 
+### Learner onboarding
+
+The React login screen supports self-service registration. `POST /api/register/` validates the username and password, applies a five-requests-per-hour per-IP registration limit, creates the account, and returns JWT tokens. Password login is limited to twenty attempts per hour per IP. AI writing calls are capped at 30 per day per learner. Email is optional in this initial release; email verification and password recovery remain launch requirements.
+
 ### Stage 3 API routes
 
 - `GET /vocabulary/api/words/` — curated shared vocabulary (authenticated)
@@ -30,7 +34,8 @@ An English-learning application with a Django REST API, a React learning interfa
 - `GET|POST /reading/api/progress/` — read or update per-user article progress
 - `GET|PATCH /learning/api/preferences/` — retrieve or update personal learning settings
 - `GET /quiz/api/questions/?type=vocabulary|reading|grammar` — fetch a quiz (answers are not exposed)
-- `POST /quiz/api/submit/` and `GET /quiz/api/history/` — submit answers and view the current user's recent results
+- `POST /quiz/api/submit/`, `GET /quiz/api/history/`, and `GET /quiz/api/stats/` — submit answers, view recent results, and retrieve per-user streak plus seven-day quiz activity
+- `POST /api/register/` — create a learner account with validated password and receive JWT tokens
 
 Run `python manage.py migrate` after pulling the changes so the personal data tables and starter quiz questions are created. The new endpoints require the same JWT login used by the React client.
 
@@ -88,3 +93,20 @@ See `.env.example` for the environment variables. In production, use a strong se
 ## CI checks
 
 GitHub Actions checks Django configuration, migration consistency, backend tests, dependency consistency, and the React production build for pull requests and pushes to `main`.
+
+
+## Deployment configuration
+
+The React app does not assume that the Django API runs on the same machine as the learner's browser.
+
+- For local development, the frontend defaults to `http://127.0.0.1:8000`; Django-rendered landing/dashboard links use `FRONTEND_URL` (default `http://127.0.0.1:5173`).
+- For a same-origin deployment (frontend and API served behind the same domain), leave `VITE_API_BASE_URL` unset in the production build.
+- For a separate API origin, set `VITE_API_BASE_URL` to the public API origin before building the frontend, for example `https://api.example.com` (replace this example with your actual API URL).
+- Add the frontend's public origin to Django's `CORS_ALLOWED_ORIGINS`, and configure `ALLOWED_HOSTS` for the API host. Do not use wildcard origins for authenticated production traffic.
+- Keep `SECRET_KEY` and `GROQ_API_KEY` on the server only. Never put either secret in a `VITE_*` variable or commit a real `.env` file.
+
+### Product-readiness notes
+
+- The dashboard's streak and seven-day activity chart use per-user quiz-session statistics from the API, not login dates or a capped recent-history list. They measure quiz sessions, not every possible learning action.
+- Before public launch, configure HTTPS and review Django's deployment checks, token storage/XSS exposure, configure a shared production cache (such as Redis) so throttles work across multiple workers, backups, privacy/retention terms, monitoring, and the current npm audit findings.
+- A passing CI build validates the automated checks; it does not replace a real-browser acceptance test with a configured API key and production-like environment.

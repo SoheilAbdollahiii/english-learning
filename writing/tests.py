@@ -72,6 +72,14 @@ class WritingWorkspaceTests(TestCase):
         self.assertEqual(WritingSubmission.objects.count(), 0)
         self.assertContains(response, "5,000 characters or fewer")
 
+    @patch("writing.views._consume_html_correction_quota", return_value=False)
+    def test_web_form_enforces_daily_writing_limit(self, _quota):
+        self.client.force_login(self.user)
+        response = self.client.post(self.workspace_url, {"original_text": "I am practicing English."})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(WritingSubmission.objects.count(), 0)
+        self.assertContains(response, "Daily writing limit reached")
+
     def test_user_only_sees_own_submissions(self):
         WritingSubmission.objects.create(user=self.user, original_text="My private writing")
         WritingSubmission.objects.create(user=self.other_user, original_text="Someone else's private writing")

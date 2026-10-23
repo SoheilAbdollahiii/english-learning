@@ -2,15 +2,10 @@ import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts'
 
-function calculateCurrentStreak() {
-  const today = new Date().toDateString()
-  const lastLogin = localStorage.getItem('last_login_date')
-  const storedStreak = Number.parseInt(localStorage.getItem('user_streak') || '0', 10)
-  if (lastLogin === today) return storedStreak
-  const yesterday = new Date()
-  yesterday.setDate(yesterday.getDate() - 1)
-  return lastLogin === yesterday.toDateString() ? storedStreak + 1 : 1
-}
+// Set VITE_API_BASE_URL when the frontend and API are deployed on different origins.
+// In production, an empty base uses same-origin routes; local development targets Django.
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '')).replace(/\/$/, '')
+const apiUrl = (path) => `${API_BASE}${path}`
 
 async function apiFetch(url, options = {}) {
   let token = localStorage.getItem('access_token');
@@ -27,7 +22,7 @@ async function apiFetch(url, options = {}) {
     const refreshToken = localStorage.getItem('refresh_token');
     if (refreshToken) {
       try {
-        const refreshRes = await fetch('http://127.0.0.1:8000/api/token/refresh/', {
+        const refreshRes = await fetch(apiUrl('/api/token/refresh/'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refresh: refreshToken })
@@ -59,13 +54,17 @@ async function apiFetch(url, options = {}) {
 
 export default function App() {
   const { t, i18n } = useTranslation()
-  const [activeTab, setActiveTab] = useState('dashboard')
+  const [activeTab, setActiveTab] = useState(() => {
+    const requestedTab = new URLSearchParams(window.location.search).get('tab')
+    return ['dashboard', 'reading', 'vocabulary', 'writing', 'quiz'].includes(requestedTab) ? requestedTab : 'dashboard'
+  })
   const [words, setWords] = useState([])
   const [articles, setArticles] = useState([])
   const [writings, setWritings] = useState([])
   const [personalWords, setPersonalWords] = useState([])
   const [readingProgress, setReadingProgress] = useState([])
   const [quizHistory, setQuizHistory] = useState([])
+  const [quizStats, setQuizStats] = useState({ current_streak: 0, quiz_sessions_total: 0, daily_activity: [] })
   const [preferences, setPreferences] = useState({ preferred_level: 'B1', daily_word_goal: 10, learning_goal: 'general' })
   const [preferencesSaving, setPreferencesSaving] = useState(false)
   const [readingQuery, setReadingQuery] = useState('')
@@ -91,22 +90,25 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('access_token'))
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('')
+  const [passwordConfirm, setPasswordConfirm] = useState('')
+  const [isRegistering, setIsRegistering] = useState(false)
 
-  const [streak] = useState(calculateCurrentStreak)
+  const streak = quizStats.current_streak || 0
   const chartData = useMemo(() => {
     const daysFa = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه']
     const daysEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
     const currentDays = i18n.language === 'fa' ? daysFa : daysEn
+    const activityByDate = new Map((quizStats.daily_activity || []).map((item) => [item.date, item.count]))
     const data = []
     for (let i = 6; i >= 0; i--) {
       const day = new Date()
       day.setDate(day.getDate() - i)
-      const dayKey = day.toDateString()
-      const activity = quizHistory.filter((session) => new Date(session.created_at).toDateString() === dayKey).length
-      data.push({ name: currentDays[day.getDay()], activity })
+      const dayKey = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
+      data.push({ name: currentDays[day.getDay()], activity: activityByDate.get(dayKey) || 0 })
     }
     return data
-  }, [i18n.language, quizHistory])
+  }, [i18n.language, quizStats.daily_activity])
 
   useEffect(() => {
     document.documentElement.lang = i18n.language === 'fa' ? 'fa' : 'en'
@@ -121,7 +123,7 @@ export default function App() {
   const handleLogin = async (e) => {
     e.preventDefault()
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/token/', {
+      const res = await fetch(apiUrl('/api/token/'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -138,6 +140,34 @@ export default function App() {
     } catch (err) {
       console.error('Login failed', err)
       alert(t('login_failed'))
+    }
+  }
+
+  const handleRegister = async (e) => {
+    e.preventDefault()
+    if (password !== passwordConfirm) {
+      alert(t('password_mismatch'))
+      return
+    }
+    try {
+      const res = await fetch(apiUrl('/api/register/'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password, password_confirm: passwordConfirm })
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        const details = Object.values(data || {}).flat().filter((value) => typeof value === 'string')
+        alert(details[0] || t('registration_failed'))
+        return
+      }
+      localStorage.setItem('access_token', data.access)
+      localStorage.setItem('refresh_token', data.refresh)
+      setLoading(true)
+      setIsLoggedIn(true)
+    } catch (err) {
+      console.error('Registration failed', err)
+      alert(t('registration_failed'))
     }
   }
 
@@ -165,18 +195,19 @@ export default function App() {
       setLoading(true)
       try {
         if (activeTab === 'dashboard') {
-          const [wordsRes, personalRes, articlesRes, writingsRes, preferencesRes, progressRes, historyRes] = await Promise.all([
-            apiFetch('http://127.0.0.1:8000/vocabulary/api/words/'),
-            apiFetch('http://127.0.0.1:8000/vocabulary/api/my-words/'),
-            apiFetch('http://127.0.0.1:8000/reading/api/articles/'),
-            apiFetch('http://127.0.0.1:8000/writing/api/writings/'),
-            apiFetch('http://127.0.0.1:8000/learning/api/preferences/'),
-            apiFetch('http://127.0.0.1:8000/reading/api/progress/'),
-            apiFetch('http://127.0.0.1:8000/quiz/api/history/')
+          const [wordsRes, personalRes, articlesRes, writingsRes, preferencesRes, progressRes, historyRes, statsRes] = await Promise.all([
+            apiFetch(apiUrl('/vocabulary/api/words/')),
+            apiFetch(apiUrl('/vocabulary/api/my-words/')),
+            apiFetch(apiUrl('/reading/api/articles/')),
+            apiFetch(apiUrl('/writing/api/writings/')),
+            apiFetch(apiUrl('/learning/api/preferences/')),
+            apiFetch(apiUrl('/reading/api/progress/')),
+            apiFetch(apiUrl('/quiz/api/history/')),
+            apiFetch(apiUrl('/quiz/api/stats/'))
           ])
-          const [wordsData, personalData, articlesData, writingsData, preferencesData, progressData, historyData] = await Promise.all([
+          const [wordsData, personalData, articlesData, writingsData, preferencesData, progressData, historyData, statsData] = await Promise.all([
             wordsRes.json(), personalRes.json(), articlesRes.json(), writingsRes.json(),
-            preferencesRes.json(), progressRes.json(), historyRes.json()
+            preferencesRes.json(), progressRes.json(), historyRes.json(), statsRes.json()
           ])
           setWords(Array.isArray(wordsData) ? wordsData : [])
           setPersonalWords(Array.isArray(personalData) ? personalData : [])
@@ -189,28 +220,29 @@ export default function App() {
           }
           setReadingProgress(Array.isArray(progressData) ? progressData : [])
           setQuizHistory(Array.isArray(historyData) ? historyData : [])
+          if (statsRes.ok) setQuizStats(statsData)
         } else if (activeTab === 'reading') {
           const [articlesRes, progressRes] = await Promise.all([
-            apiFetch('http://127.0.0.1:8000/reading/api/articles/'),
-            apiFetch('http://127.0.0.1:8000/reading/api/progress/')
+            apiFetch(apiUrl('/reading/api/articles/')),
+            apiFetch(apiUrl('/reading/api/progress/'))
           ])
           const [articlesData, progressData] = await Promise.all([articlesRes.json(), progressRes.json()])
           setArticles(Array.isArray(articlesData) ? articlesData : [])
           setReadingProgress(Array.isArray(progressData) ? progressData : [])
         } else if (activeTab === 'vocabulary') {
           const [wordsRes, personalRes] = await Promise.all([
-            apiFetch('http://127.0.0.1:8000/vocabulary/api/words/'),
-            apiFetch('http://127.0.0.1:8000/vocabulary/api/my-words/')
+            apiFetch(apiUrl('/vocabulary/api/words/')),
+            apiFetch(apiUrl('/vocabulary/api/my-words/'))
           ])
           const [wordsData, personalData] = await Promise.all([wordsRes.json(), personalRes.json()])
           setWords(Array.isArray(wordsData) ? wordsData : [])
           setPersonalWords(Array.isArray(personalData) ? personalData : [])
         } else if (activeTab === 'writing') {
-          const res = await apiFetch('http://127.0.0.1:8000/writing/api/writings/')
+          const res = await apiFetch(apiUrl('/writing/api/writings/'))
           const data = await res.json()
           setWritings(Array.isArray(data) ? data : [])
         } else if (activeTab === 'quiz') {
-          const res = await apiFetch('http://127.0.0.1:8000/quiz/api/history/')
+          const res = await apiFetch(apiUrl('/quiz/api/history/'))
           const data = await res.json()
           setQuizHistory(Array.isArray(data) ? data : [])
         }
@@ -233,7 +265,7 @@ export default function App() {
     setQuizAnswers({})
 
     try {
-      const res = await apiFetch(`http://127.0.0.1:8000/quiz/api/questions/?type=${type}`)
+      const res = await apiFetch(apiUrl(`/quiz/api/questions/?type=${type}`))
       const data = await res.json()
       if (res.ok) {
         setQuizQuestions(Array.isArray(data) ? data : [])
@@ -263,7 +295,7 @@ export default function App() {
   const submitQuizFinal = async (finalAnswers) => {
     setLoadingQuiz(true);
     try {
-      const res = await apiFetch('http://127.0.0.1:8000/quiz/api/submit/', {
+      const res = await apiFetch(apiUrl('/quiz/api/submit/'), {
         method: 'POST',
         body: JSON.stringify({
           quiz_type: quizType,
@@ -275,9 +307,13 @@ export default function App() {
       if (res.ok) {
         setQuizResult(resultData)
         setQuizSubmitted(true)
-        const historyRes = await apiFetch('http://127.0.0.1:8000/quiz/api/history/')
-        const historyData = await historyRes.json()
+        const [historyRes, statsRes] = await Promise.all([
+          apiFetch(apiUrl('/quiz/api/history/')),
+          apiFetch(apiUrl('/quiz/api/stats/'))
+        ])
+        const [historyData, statsData] = await Promise.all([historyRes.json(), statsRes.json()])
         setQuizHistory(Array.isArray(historyData) ? historyData : [])
+        if (statsRes.ok) setQuizStats(statsData)
       } else {
         alert(resultData.detail || t('quiz_submit_failed'))
       }
@@ -288,20 +324,11 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    const today = new Date().toDateString();
-    if (localStorage.getItem('last_login_date') !== today) {
-      localStorage.setItem('last_login_date', today);
-      localStorage.setItem('user_streak', String(streak));
-    }
-  }, [isLoggedIn, streak]);
-
   const handleWordClick = async (word) => {
     const cleanedWord = word.replace(/^[^a-zA-Z'-]+|[^a-zA-Z'-]+$/g, '').toLowerCase()
     if (!cleanedWord) return
     try {
-      const res = await apiFetch('http://127.0.0.1:8000/vocabulary/api/my-words/', {
+      const res = await apiFetch(apiUrl('/vocabulary/api/my-words/'), {
         method: 'POST',
         body: JSON.stringify({ english_word: cleanedWord, level: preferences.preferred_level || 'B1' })
       })
@@ -322,7 +349,7 @@ export default function App() {
     event.preventDefault()
     setPreferencesSaving(true)
     try {
-      const res = await apiFetch('http://127.0.0.1:8000/learning/api/preferences/', {
+      const res = await apiFetch(apiUrl('/learning/api/preferences/'), {
         method: 'PATCH',
         body: JSON.stringify(preferences)
       })
@@ -345,7 +372,7 @@ export default function App() {
 
   const markArticleRead = async (articleId, completed) => {
     try {
-      const res = await apiFetch('http://127.0.0.1:8000/reading/api/progress/', {
+      const res = await apiFetch(apiUrl('/reading/api/progress/'), {
         method: 'POST',
         body: JSON.stringify({ article_id: articleId, completed })
       })
@@ -360,7 +387,7 @@ export default function App() {
 
   const saveCuratedWord = async (word) => {
     try {
-      const res = await apiFetch('http://127.0.0.1:8000/vocabulary/api/my-words/', {
+      const res = await apiFetch(apiUrl('/vocabulary/api/my-words/'), {
         method: 'POST',
         body: JSON.stringify({ english_word: word.english_word, translation: word.translation || '', level: word.level || preferences.preferred_level || 'B1' })
       })
@@ -380,7 +407,7 @@ export default function App() {
   const practiceWord = async (word) => {
     if (!word.isPersonal) return
     try {
-      const res = await apiFetch(`http://127.0.0.1:8000/vocabulary/api/my-words/${word.id}/practice/`, { method: 'POST' })
+      const res = await apiFetch(apiUrl(`/vocabulary/api/my-words/${word.id}/practice/`), { method: 'POST' })
       const data = await res.json()
       if (res.ok) {
         setPersonalWords((current) => current.map((item) => item.id === data.id ? data : item))
@@ -392,7 +419,7 @@ export default function App() {
 
   const updateWordTranslation = async (word, translation) => {
     try {
-      const res = await apiFetch(`http://127.0.0.1:8000/vocabulary/api/my-words/${word.id}/`, {
+      const res = await apiFetch(apiUrl(`/vocabulary/api/my-words/${word.id}/`), {
         method: 'PATCH',
         body: JSON.stringify({ translation })
       })
@@ -405,7 +432,7 @@ export default function App() {
 
   const deletePersonalWord = async (word) => {
     try {
-      const res = await apiFetch(`http://127.0.0.1:8000/vocabulary/api/my-words/${word.id}/`, { method: 'DELETE' })
+      const res = await apiFetch(apiUrl(`/vocabulary/api/my-words/${word.id}/`), { method: 'DELETE' })
       if (res.ok) setPersonalWords((current) => current.filter((item) => item.id !== word.id))
     } catch (err) {
       console.error('Could not delete saved word:', err)
@@ -436,7 +463,7 @@ export default function App() {
 
     setSubmittingWriting(true);
     try {
-      const res = await apiFetch('http://127.0.0.1:8000/writing/api/writings/', {
+      const res = await apiFetch(apiUrl('/writing/api/writings/'), {
         method: 'POST',
         body: JSON.stringify({ original_text: writingText })
       });
@@ -465,17 +492,22 @@ export default function App() {
             <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mb-4">
               <span className="text-white font-bold text-2xl">A</span>
             </div>
-            <h2 className={`text-2xl font-extrabold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t('login')}</h2>
+            <h2 className={`text-2xl font-extrabold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{isRegistering ? t('create_account') : t('login')}</h2>
           </div>
-          <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+          <form className="mt-8 space-y-6" onSubmit={isRegistering ? handleRegister : handleLogin}>
             <div className="space-y-4">
-              <input type="text" required value={username} onChange={(e) => setUsername(e.target.value)} className={`appearance-none rounded-xl block w-full px-4 py-3 border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-200 text-gray-900 placeholder-gray-400'}`} placeholder={t('username')} />
-              <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className={`appearance-none rounded-xl block w-full px-4 py-3 border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-200 text-gray-900 placeholder-gray-400'}`} placeholder={t('password')} />
+              <input type="text" required autoComplete="username" aria-label={t("username")} value={username} onChange={(e) => setUsername(e.target.value)} className={`appearance-none rounded-xl block w-full px-4 py-3 border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-200 text-gray-900 placeholder-gray-400'}`} placeholder={t('username')} />
+              {isRegistering && <input type="email" autoComplete="email" aria-label={t("email_optional")} value={email} onChange={(e) => setEmail(e.target.value)} className={`appearance-none rounded-xl block w-full px-4 py-3 border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-200 text-gray-900 placeholder-gray-400'}`} placeholder={t('email_optional')} />}
+              <input type="password" required autoComplete={isRegistering ? 'new-password' : 'current-password'} aria-label={t('password')} value={password} onChange={(e) => setPassword(e.target.value)} className={`appearance-none rounded-xl block w-full px-4 py-3 border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-200 text-gray-900 placeholder-gray-400'}`} placeholder={t('password')} />
+              {isRegistering && <input type="password" required autoComplete="new-password" aria-label={t("password_confirm")} value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)} className={`appearance-none rounded-xl block w-full px-4 py-3 border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-200 text-gray-900 placeholder-gray-400'}`} placeholder={t('password_confirm')} />}
             </div>
             <button type="submit" className="w-full flex justify-center py-3 px-4 border border-transparent font-bold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 transition-colors">
-              {t('login')}
+              {isRegistering ? t('register') : t('login')}
             </button>
           </form>
+          <button type="button" onClick={() => setIsRegistering((current) => !current)} className="w-full text-sm font-bold text-indigo-600 hover:text-indigo-800">
+            {isRegistering ? t('already_have_account') : t('no_account')}
+          </button>
           <div className="flex gap-2 pt-4">
             <button onClick={toggleLanguage} title={t('language_toggle')} aria-label={t('language_toggle')} className="flex-1 text-sm font-bold text-gray-500 hover:text-indigo-600 transition-colors">
               {i18n.language === 'en' ? '🇮🇷 فارسی' : '🇬🇧 English'}
@@ -916,13 +948,15 @@ function InteractiveText({ text, onWordClick, darkMode }) {
         const cleanWord = word.replace(/[.,!?]/g, ''); 
         return (
           <span key={index}>
-            <span
+            <button
+              type="button"
               onClick={() => onWordClick(cleanWord)}
-              className={`cursor-pointer transition-colors rounded px-0.5 ${darkMode ? 'hover:bg-indigo-950 hover:text-indigo-300' : 'hover:bg-indigo-100 hover:text-indigo-800'}`}
+              className={`cursor-pointer transition-colors rounded px-0.5 bg-transparent border-0 p-0 align-baseline ${darkMode ? 'hover:bg-indigo-950 hover:text-indigo-300' : 'hover:bg-indigo-100 hover:text-indigo-800'}`}
               title="Add to Vocabulary"
+              aria-label={`Save word ${cleanWord}`}
             >
               {word}
-            </span>
+            </button>
             {' '}
           </span>
         );

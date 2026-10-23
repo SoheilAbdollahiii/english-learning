@@ -13,6 +13,7 @@ SECRET_KEY = config("SECRET_KEY")
 DEBUG = config("DEBUG", default=False, cast=bool)
 GROQ_API_KEY = config("GROQ_API_KEY", default="")
 GROQ_MODEL = config("GROQ_MODEL", default="llama-3.3-70b-versatile")
+FRONTEND_URL = config("FRONTEND_URL", default="http://127.0.0.1:5173").rstrip("/")
 ALLOWED_HOSTS = [
     host.strip()
     for host in config(
@@ -61,6 +62,7 @@ TEMPLATES = [
             "context_processors": [
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
+                "core.context_processors.frontend_url",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ],
@@ -110,6 +112,7 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 REST_FRAMEWORK = {
+    "DEFAULT_THROTTLE_RATES": {"registration": "5/hour", "login": "20/hour", "writing_correction": "30/day"},
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),

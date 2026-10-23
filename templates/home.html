@@ -7,11 +7,11 @@
         <div class="col-lg-8">
             <span class="eyebrow">YOUR ENGLISH, YOUR PACE</span>
             <h1 class="display-5 fw-bold mt-3 mb-4">Build confidence.<br>One sentence at a time.</h1>
-            <p class="lead mb-4">A welcoming place to practice writing, keep track of your work, and grow your English skills step by step.</p>
+            <p class="lead mb-4">Build a daily habit with reading, vocabulary, quizzes, and private AI-assisted writing practice.</p>
             {% if user.is_authenticated %}
                 <a href="{% url 'dashboard' %}" class="btn btn-light btn-lg">Go to my dashboard <span aria-hidden="true">→</span></a>
             {% else %}
-                <a href="{% url 'login' %}" class="btn btn-light btn-lg">Start your practice <span aria-hidden="true">→</span></a>
+                <a href="{{ FRONTEND_URL }}" class="btn btn-light btn-lg">Start learning <span aria-hidden="true">→</span></a>
             {% endif %}
         </div>
         <div class="col-lg-4">
@@ -26,7 +26,7 @@
 </section>
 <div class="row g-3 mt-3 mb-4">
     <div class="col-md-4"><div class="surface-card p-4 h-100"><span class="eyebrow">01</span><h2 class="h5 fw-bold mt-2">Writing practice</h2><p class="text-secondary mb-0">Capture your thoughts and keep your writing together.</p></div></div>
-    <div class="col-md-4"><div class="surface-card p-4 h-100"><span class="eyebrow">02</span><h2 class="h5 fw-bold mt-2">Vocabulary</h2><p class="text-secondary mb-0">A shared vocabulary collection is available in the backend; the learning interface is still in development.</p></div></div>
-    <div class="col-md-4"><div class="surface-card p-4 h-100"><span class="eyebrow">03</span><h2 class="h5 fw-bold mt-2">Reading</h2><p class="text-secondary mb-0">Reading content is being prepared for a dedicated learning experience.</p></div></div>
+    <div class="col-md-4"><div class="surface-card p-4 h-100"><span class="eyebrow">02</span><h2 class="h5 fw-bold mt-2">Vocabulary</h2><p class="text-secondary mb-0">Save useful words, add translations, and practice vocabulary at your own level.</p></div></div>
+    <div class="col-md-4"><div class="surface-card p-4 h-100"><span class="eyebrow">03</span><h2 class="h5 fw-bold mt-2">Reading</h2><p class="text-secondary mb-0">Read level-based articles, track what you have finished, and test your understanding.</p></div></div>
 </div>
 {% endblock %}
