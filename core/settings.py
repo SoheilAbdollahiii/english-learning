@@ -112,6 +112,7 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 REST_FRAMEWORK = {
+    "DEFAULT_THROTTLE_RATES": {"anon": "10/hour", "user": "1000/day"},
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
