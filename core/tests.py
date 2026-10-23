@@ -36,6 +36,7 @@ class CorePageRoutingTests(TestCase):
         self.assertContains(dashboard, "Writing studio")
         self.assertContains(dashboard, "Open vocabulary")
         self.assertContains(dashboard, "Open reading")
+        self.assertContains(dashboard, "Open learning app")
         self.assertEqual(writing.status_code, 200)
         self.assertContains(writing, "Make space for better English.")
 
