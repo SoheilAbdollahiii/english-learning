@@ -63,6 +63,21 @@ class PersonalVocabularyTests(TestCase):
         self.assertEqual([row["english_word"] for row in listing.data], ["resilient"])
         self.assertEqual(UserWord.objects.filter(user=self.other).count(), 0)
 
+    def test_saved_word_preserves_example_sentence_for_flashcards(self):
+        response = self.client.post(
+            self.url,
+            {
+                "english_word": "postpone",
+                "translation": "به تعویق انداختن",
+                "example": "They postponed the meeting until Friday.",
+                "level": "B1",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["example"], "They postponed the meeting until Friday.")
+        self.assertEqual(UserWord.objects.get(user=self.learner).example, "They postponed the meeting until Friday.")
+
     def test_duplicate_word_is_not_created_twice(self):
         first = self.client.post(self.url, {"english_word": "resilient"}, format="json")
         second = self.client.post(self.url, {"english_word": "RESILIENT"}, format="json")
