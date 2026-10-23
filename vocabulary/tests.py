@@ -128,6 +128,14 @@ class PersonalVocabularyTests(TestCase):
         )
         self.assertEqual(invalid.status_code, 400)
 
+    def test_non_string_level_is_rejected_without_server_error(self):
+        word = UserWord.objects.create(user=self.learner, english_word="careful", proficiency=25)
+        response = self.client.patch(
+            reverse("my_word_detail", args=[word.id]), {"level": []}, format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("level", response.data)
+
     def test_user_cannot_edit_another_users_word(self):
         word = UserWord.objects.create(user=self.other, english_word="private")
         response = self.client.patch(reverse("my_word_detail", args=[word.id]), {"translation": "secret"}, format="json")
