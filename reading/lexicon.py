@@ -93,24 +93,44 @@ def _dictionary_entry(term):
             payload = response.json()
             first = payload[0] if isinstance(payload, list) and payload and isinstance(payload[0], dict) else {}
             meanings = first.get("meanings", [])
+            parsed_meanings = []
+            api_synonyms = []
+            api_antonyms = []
             for meaning in meanings if isinstance(meanings, list) else []:
                 if not isinstance(meaning, dict):
                     continue
+                part_of_speech = meaning.get("partOfSpeech", "")
                 definitions = meaning.get("definitions", [])
                 for definition in definitions if isinstance(definitions, list) else []:
                     if not isinstance(definition, dict) or not definition.get("definition"):
                         continue
-                    entry = {
+                    example = definition.get("example", "")
+                    parsed_meanings.append({
+                        "part_of_speech": part_of_speech,
                         "definition": definition.get("definition", ""),
-                        "translation": "",
-                        "example": definition.get("example", ""),
-                        "example_translation": "",
-                        "term_type": "phrase" if " " in normalized else "word",
-                        "part_of_speech": meaning.get("partOfSpeech", ""),
-                    }
-                    break
-                if entry:
-                    break
+                        "example": example,
+                        "example_translation": _translate_to_persian(example) if example else "",
+                    })
+                    api_synonyms.extend(definition.get("synonyms", []) if isinstance(definition.get("synonyms"), list) else [])
+                    api_antonyms.extend(definition.get("antonyms", []) if isinstance(definition.get("antonyms"), list) else [])
+                api_synonyms.extend(meaning.get("synonyms", []) if isinstance(meaning.get("synonyms"), list) else [])
+                api_antonyms.extend(meaning.get("antonyms", []) if isinstance(meaning.get("antonyms"), list) else [])
+            phonetics = first.get("phonetics", [])
+            phonetic = next((item.get("text", "") for item in phonetics if isinstance(item, dict) and item.get("text")), "") if isinstance(phonetics, list) else ""
+            entry = {
+                "definition": parsed_meanings[0]["definition"] if parsed_meanings else "",
+                "translation": "",
+                "example": parsed_meanings[0]["example"] if parsed_meanings else "",
+                "example_translation": parsed_meanings[0]["example_translation"] if parsed_meanings else "",
+                "term_type": "phrase" if " " in normalized else "word",
+                "part_of_speech": parsed_meanings[0]["part_of_speech"] if parsed_meanings else "",
+                "meanings": parsed_meanings[:8],
+                "phonetic": phonetic,
+                "synonyms": list(dict.fromkeys(api_synonyms))[:12],
+                "antonyms": list(dict.fromkeys(api_antonyms))[:12],
+            }
+            if not entry["definition"]:
+                entry = None
     except (requests.RequestException, ValueError, TypeError, IndexError):
         entry = None
     if entry:
