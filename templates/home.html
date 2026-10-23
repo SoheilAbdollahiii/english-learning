@@ -1,16 +1,32 @@
 {% extends 'base.html' %}
+{% block title %}Smart English Learning · Your English Studio{% endblock %}
 
 {% block content %}
-<div class="text-center py-5">
-    <h1 class="display-5 fw-bold">Welcome to Smart English Learning</h1>
-    <p class="lead mb-4">Your AI-powered personal tutor for Writing, Reading, and Vocabulary.</p>
-    
-    {% if not user.is_authenticated %}
-        <a href="{% url 'login' %}" class="btn btn-primary btn-lg px-4">Login to Start</a>
-    {% else %}
-        <div class="alert alert-success mt-3" role="alert">
-            You are logged in! AI features are coming soon...
+<section class="writing-hero rounded-4 p-4 p-md-5 my-3 my-lg-5">
+    <div class="row align-items-center g-5">
+        <div class="col-lg-8">
+            <span class="eyebrow">YOUR ENGLISH, YOUR PACE</span>
+            <h1 class="display-5 fw-bold mt-3 mb-4">Build confidence.<br>One sentence at a time.</h1>
+            <p class="lead mb-4">A welcoming place to practice writing, keep track of your work, and grow your English skills step by step.</p>
+            {% if user.is_authenticated %}
+                <a href="{% url 'dashboard' %}" class="btn btn-light btn-lg">Go to my dashboard <span aria-hidden="true">→</span></a>
+            {% else %}
+                <a href="{% url 'login' %}" class="btn btn-light btn-lg">Start your practice <span aria-hidden="true">→</span></a>
+            {% endif %}
         </div>
-    {% endif %}
+        <div class="col-lg-4">
+            <div class="surface-card p-4 text-dark">
+                <span class="eyebrow">A GOOD PLACE TO START</span>
+                <h2 class="h4 fw-bold mt-3">Write without pressure.</h2>
+                <p class="text-secondary mb-0">Save a short paragraph, reflect on your progress, and come back whenever you're ready to practice again.</p>
+                <div class="d-flex gap-2 mt-4"><span class="soft-pill">Writing journal</span><span class="soft-pill">Private history</span></div>
+            </div>
+        </div>
+    </div>
+</section>
+<div class="row g-3 mt-3 mb-4">
+    <div class="col-md-4"><div class="surface-card p-4 h-100"><span class="eyebrow">01</span><h2 class="h5 fw-bold mt-2">Writing practice</h2><p class="text-secondary mb-0">Capture your thoughts and keep your writing together.</p></div></div>
+    <div class="col-md-4"><div class="surface-card p-4 h-100"><span class="eyebrow">02</span><h2 class="h5 fw-bold mt-2">Vocabulary</h2><p class="text-secondary mb-0">A shared vocabulary collection is available in the backend; the learning interface is still in development.</p></div></div>
+    <div class="col-md-4"><div class="surface-card p-4 h-100"><span class="eyebrow">03</span><h2 class="h5 fw-bold mt-2">Reading</h2><p class="text-secondary mb-0">Reading content is being prepared for a dedicated learning experience.</p></div></div>
 </div>
 {% endblock %}
