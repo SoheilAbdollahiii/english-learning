@@ -128,6 +128,17 @@ class AccountDeletionTests(TestCase):
         self.assertEqual(missing_confirmation.status_code, 400)
         self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
 
+    def test_staff_accounts_cannot_be_deleted_through_learner_api(self):
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
+        response = self.api.delete(
+            reverse("delete_account"),
+            {"confirmation": "DELETE", "password": "Strong-test-pass-123"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
+
     def test_account_deletion_removes_owned_words_but_not_other_users(self):
         from vocabulary.models import UserWord
 
