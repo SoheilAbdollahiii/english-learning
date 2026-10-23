@@ -25,6 +25,15 @@ class LearningQuizTests(TestCase):
             self.assertGreaterEqual(len(response.data), 1)
             self.assertNotIn("correct_option", response.data[0])
 
+    def test_each_quiz_type_has_five_questions_at_every_supported_level(self):
+        for quiz_type in ("vocabulary", "reading", "grammar"):
+            for level in ("A1", "B1", "C1"):
+                response = self.client.get(reverse("quiz_questions"), {"type": quiz_type, "level": level})
+                self.assertEqual(response.status_code, 200, f"Missing {quiz_type} content at {level}")
+                self.assertEqual(len(response.data), 5)
+                self.assertTrue(all(item["level"] == level for item in response.data))
+                self.assertNotIn("correct_option", response.data[0])
+
     def test_invalid_quiz_type_is_rejected(self):
         response = self.client.get(reverse("quiz_questions"), {"type": "made-up"})
         self.assertEqual(response.status_code, 400)
@@ -33,13 +42,15 @@ class LearningQuizTests(TestCase):
         question = Question.objects.filter(quiz_type="grammar").first()
         response = self.client.post(
             reverse("quiz_submit"),
-            {"quiz_type": "grammar", "answers": {str(question.id): question.correct_option}},
+            {"quiz_type": "grammar", "level": question.level, "answers": {str(question.id): question.correct_option}},
             format="json",
         )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["score"], 1)
         self.assertEqual(response.data["total"], 1)
+        self.assertEqual(response.data["level"], question.level)
         self.assertEqual(QuizSession.objects.filter(user=self.learner).count(), 1)
+        self.assertEqual(QuizSession.objects.get(user=self.learner).level, question.level)
         history = self.client.get(reverse("quiz_history"))
         self.assertEqual(len(history.data), 1)
         self.assertEqual(history.data[0]["quiz_type"], "grammar")
@@ -51,6 +62,16 @@ class LearningQuizTests(TestCase):
         response = self.client.post(
             reverse("quiz_submit"),
             {"quiz_type": "vocabulary", "answers": {str(question.id): "A"}},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(QuizSession.objects.count(), 0)
+
+    def test_submission_rejects_questions_from_a_different_level(self):
+        question = Question.objects.filter(quiz_type="grammar", level="A1").first()
+        response = self.client.post(
+            reverse("quiz_submit"),
+            {"quiz_type": "grammar", "level": "B1", "answers": {str(question.id): question.correct_option}},
             format="json",
         )
         self.assertEqual(response.status_code, 400)
