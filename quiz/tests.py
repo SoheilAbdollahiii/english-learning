@@ -38,6 +38,10 @@ class LearningQuizTests(TestCase):
         response = self.client.get(reverse("quiz_questions"), {"type": "made-up"})
         self.assertEqual(response.status_code, 400)
 
+    def test_invalid_quiz_level_is_rejected(self):
+        response = self.client.get(reverse("quiz_questions"), {"type": "grammar", "level": "D2"})
+        self.assertEqual(response.status_code, 400)
+
     def test_submitting_quiz_saves_result_and_history_is_private(self):
         question = Question.objects.filter(quiz_type="grammar").first()
         response = self.client.post(
@@ -54,6 +58,7 @@ class LearningQuizTests(TestCase):
         history = self.client.get(reverse("quiz_history"))
         self.assertEqual(len(history.data), 1)
         self.assertEqual(history.data[0]["quiz_type"], "grammar")
+        self.assertEqual(history.data[0]["level"], question.level)
         self.client.force_authenticate(user=self.other)
         self.assertEqual(len(self.client.get(reverse("quiz_history")).data), 0)
 
