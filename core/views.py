@@ -41,3 +41,24 @@ def register_learner(request):
 class ThrottledTokenObtainPairView(TokenObtainPairView):
     """Limit anonymous password attempts before issuing JWTs."""
     throttle_classes = [LoginRateThrottle]
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_account(request):
+    """Permanently delete the authenticated learner and their owned data."""
+    password = request.data.get("password", "")
+    confirmation = request.data.get("confirmation", "")
+    if confirmation != "DELETE":
+        return Response(
+            {"confirmation": "Type DELETE to confirm account removal."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not password or not request.user.check_password(password):
+        return Response(
+            {"password": "Enter your current password to delete the account."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    request.user.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
