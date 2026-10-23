@@ -22,7 +22,7 @@ An English-learning application with a Django REST API, a React learning interfa
 
 ### Learner onboarding
 
-The React login screen supports self-service registration. `POST /api/register/` validates the username and password, applies anonymous rate limiting, creates the account, and returns JWT tokens. Email is optional in this initial release; email verification and password recovery remain launch requirements.
+The React login screen supports self-service registration. `POST /api/register/` validates the username and password, applies a five-requests-per-hour per-IP registration limit, creates the account, and returns JWT tokens. Password login is limited to twenty attempts per hour per IP. Email is optional in this initial release; email verification and password recovery remain launch requirements.
 
 ### Stage 3 API routes
 
@@ -108,5 +108,5 @@ The React app does not assume that the Django API runs on the same machine as th
 ### Product-readiness notes
 
 - The dashboard's streak and seven-day activity chart use per-user quiz-session statistics from the API, not login dates or a capped recent-history list. They measure quiz sessions, not every possible learning action.
-- Before public launch, configure HTTPS and review Django's deployment checks, token storage/XSS exposure, rate limits for authentication and AI correction, backups, privacy/retention terms, monitoring, and the current npm audit findings.
+- Before public launch, configure HTTPS and review Django's deployment checks, token storage/XSS exposure, add rate limiting for AI correction, backups, privacy/retention terms, monitoring, and the current npm audit findings.
 - A passing CI build validates the automated checks; it does not replace a real-browser acceptance test with a configured API key and production-like environment.
