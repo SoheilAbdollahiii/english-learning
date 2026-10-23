@@ -733,6 +733,8 @@ def submit_daily_challenge(request):
             details.append({
                 "question_id": question.id,
                 "quiz_type": question.quiz_type,
+                "topic": question.topic or question.quiz_type,
+                "level": question.level,
                 "question_text": question.question_text,
                 "user_answer": user_answer,
                 "is_correct": is_correct,
@@ -775,15 +777,24 @@ def submit_daily_challenge(request):
         attempt.correct_answers = correct
         attempt.xp_awarded = xp_awarded
         attempt.save(update_fields=["completed_at", "correct_answers", "xp_awarded"])
-        QuizSession.objects.create(
+        previous_sessions = list(
+            QuizSession.objects.filter(user=request.user).order_by("-created_at")[:10]
+        )
+        analysis = build_performance_analysis(details, elapsed_seconds, previous_sessions)
+        session = QuizSession.objects.create(
             user=request.user,
             quiz_type="mixed",
             level="all",
             score=correct,
             total_questions=attempt.total_questions,
+            duration_seconds=elapsed_seconds,
+            topic_breakdown={item["topic"]: item for item in analysis["topic_breakdown"]},
+            mistake_patterns=analysis["common_mistakes"],
         )
+        analysis["session_id"] = session.id
 
     return Response({
+        "session_id": session.id,
         "date": today.isoformat(),
         "correct_answers": correct,
         "total": attempt.total_questions,
@@ -792,6 +803,7 @@ def submit_daily_challenge(request):
         "speed_bonus_awarded": elapsed_seconds <= DAILY_CHALLENGE_SECONDS,
         "elapsed_seconds": elapsed_seconds,
         "details": details,
+        "analysis": analysis,
         "gamification": _gamification_payload(profile),
         "message": "Daily challenge completed!",
     }, status=status.HTTP_201_CREATED)
