@@ -312,7 +312,7 @@ export default function App() {
       setCurrentQuestionIndex(0)
       setQuizTimeExpired(false)
       setQuizTotalDuration(data.duration_seconds)
-      setQuizTimeLeft(data.duration_seconds)
+      setQuizTimeLeft(data.remaining_seconds ?? data.duration_seconds)
       setQuizTimerMode('total')
       setQuizAnswerMode('end')
       setQuizAdaptiveMode(false)

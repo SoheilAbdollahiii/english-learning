@@ -460,10 +460,13 @@ def daily_challenge(request):
             attempt = DailyChallengeAttempt.objects.get(user=request.user, challenge_date=today)
 
     profile, _ = UserGamification.objects.get_or_create(user=request.user)
+    elapsed_seconds = max(0, int((timezone.now() - attempt.created_at).total_seconds()))
     payload = {
         "date": today.isoformat(),
         "question_count": attempt.total_questions,
         "duration_seconds": DAILY_CHALLENGE_SECONDS,
+        "elapsed_seconds": elapsed_seconds,
+        "remaining_seconds": max(0, DAILY_CHALLENGE_SECONDS - elapsed_seconds),
         "completed": attempt.is_completed,
         "correct_answers": attempt.correct_answers if attempt.is_completed else None,
         "xp_awarded": attempt.xp_awarded if attempt.is_completed else 0,
