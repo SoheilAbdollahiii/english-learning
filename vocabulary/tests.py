@@ -144,6 +144,24 @@ class PersonalVocabularyTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(UserWord.objects.get(id=word.id).proficiency, 25)
 
+    def test_translation_updates_reject_non_string_and_overlong_values(self):
+        word = UserWord.objects.create(
+            user=self.learner,
+            english_word="consistent",
+            translation="پایدار",
+        )
+        url = reverse("my_word_detail", args=[word.id])
+        for invalid_translation in ([], {"text": "invalid"}, "x" * 101):
+            with self.subTest(value_type=type(invalid_translation).__name__):
+                response = self.client.patch(
+                    url,
+                    {"translation": invalid_translation},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 400)
+                word.refresh_from_db()
+                self.assertEqual(word.translation, "پایدار")
+
     def test_user_cannot_edit_another_users_word(self):
         word = UserWord.objects.create(user=self.other, english_word="private")
         response = self.client.patch(reverse("my_word_detail", args=[word.id]), {"translation": "secret"}, format="json")
