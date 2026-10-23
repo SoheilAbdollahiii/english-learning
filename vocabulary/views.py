@@ -100,11 +100,16 @@ def practice_word(request, word_id):
 @permission_classes([IsAuthenticated])
 def review_queue(request):
     """Return up to 20 of the current learner's vocabulary items due for review."""
-    due_words = UserWord.objects.filter(
+    due_query = UserWord.objects.filter(
         user=request.user,
         next_review_at__lte=timezone.now(),
-    ).order_by("next_review_at", "english_word")[:20]
-    return Response(UserWordSerializer(due_words, many=True).data)
+    ).order_by("next_review_at", "english_word")
+    due_count = due_query.count()
+    due_words = due_query[:20]
+    return Response({
+        "count": due_count,
+        "results": UserWordSerializer(due_words, many=True).data,
+    })
 
 
 def _record_review(word, remembered):
