@@ -1,74 +1,111 @@
+import random
+
+from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .models import Question, QuizSession
-from .serializers import QuestionSerializer, QuizSessionSerializer
-import random
 
-@api_view(['GET'])
+from .models import Question, QuizSession
+from .serializers import QuestionSerializer
+
+
+QUIZ_TYPES = {"vocabulary", "reading", "grammar"}
+
+
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_quiz_questions(request):
-    quiz_type = request.GET.get('type', 'vocabulary')
-    questions = list(Question.objects.filter(quiz_type=quiz_type))
-    
+    quiz_type = request.query_params.get("type", "vocabulary").strip().lower()
+    if quiz_type not in QUIZ_TYPES:
+        return Response({"detail": "Choose vocabulary, reading, or grammar."}, status=status.HTTP_400_BAD_REQUEST)
+
+    questions = list(Question.objects.filter(quiz_type=quiz_type).order_by("id"))
     if not questions:
-        sample = Question.objects.create(
-            quiz_type=quiz_type,
-            question_text="Choose the correct synonym for 'Happy':",
-            option_a="Sad",
-            option_b="Joyful",
-            option_c="Angry",
-            option_d="Tired",
-            correct_option="B",
-            explanation="'Joyful' means feeling, expressing, or causing great pleasure and happiness.",
-            level="B1"
+        return Response(
+            {"detail": "No questions are available for this quiz yet. Please contact the site administrator."},
+            status=status.HTTP_404_NOT_FOUND,
         )
-        questions = [sample]
 
     selected = random.sample(questions, min(len(questions), 5))
-    serializer = QuestionSerializer(selected, many=True)
-    return Response(serializer.data)
+    return Response(QuestionSerializer(selected, many=True).data)
 
-@api_view(['POST'])
+
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def submit_quiz(request):
-    data = request.data
-    quiz_type = data.get('quiz_type', 'vocabulary')
-    answers = data.get('answers', {}) # دیکشنری به شکل {question_id: 'A', ...}
-    
-    score = 0
-    total = len(answers)
-    detailed_results = []
-    
-    for q_id, user_ans in answers.items():
-        try:
-            q = Question.objects.get(id=q_id)
-            is_correct = q.correct_option.upper() == user_ans.upper()
-            if is_correct:
-                score += 1
-            
-            detailed_results.append({
-                'question_id': q.id,
-                'question_text': q.question_text,
-                'user_answer': user_ans,
-                'correct_answer': q.correct_option,
-                'is_correct': is_correct,
-                'explanation': q.explanation or 'No explanation provided for this question.'
-            })
-        except Question.DoesNotExist:
-            continue
+    quiz_type = str(request.data.get("quiz_type", "vocabulary")).strip().lower()
+    answers = request.data.get("answers", {})
+    if quiz_type not in QUIZ_TYPES:
+        return Response({"detail": "Choose vocabulary, reading, or grammar."}, status=status.HTTP_400_BAD_REQUEST)
+    if not isinstance(answers, dict) or not answers:
+        return Response({"answers": "Submit at least one answer."}, status=status.HTTP_400_BAD_REQUEST)
 
-    session = QuizSession.objects.create(
+    question_ids = []
+    for question_id in answers:
+        try:
+            question_ids.append(int(question_id))
+        except (TypeError, ValueError):
+            return Response({"answers": "Question IDs must be integers."}, status=status.HTTP_400_BAD_REQUEST)
+
+    questions = {
+        question.id: question
+        for question in Question.objects.filter(id__in=question_ids, quiz_type=quiz_type)
+    }
+    if not questions:
+        return Response({"answers": "No valid questions were submitted for this quiz."}, status=status.HTTP_400_BAD_REQUEST)
+
+    score = 0
+    details = []
+    for question_id in question_ids:
+        question = questions.get(question_id)
+        if question is None:
+            continue
+        user_answer = str(answers[str(question_id)] if str(question_id) in answers else answers[question_id]).upper()
+        if user_answer not in {"A", "B", "C", "D"}:
+            return Response({"answers": "Answers must be A, B, C, or D."}, status=status.HTTP_400_BAD_REQUEST)
+        is_correct = question.correct_option.upper() == user_answer
+        score += int(is_correct)
+        details.append({
+            "question_id": question.id,
+            "question_text": question.question_text,
+            "user_answer": user_answer,
+            "correct_answer": question.correct_option.upper(),
+            "is_correct": is_correct,
+            "explanation": question.explanation or "No explanation provided for this question.",
+        })
+
+    total = len(details)
+    if total == 0:
+        return Response({"answers": "No valid answers were submitted."}, status=status.HTTP_400_BAD_REQUEST)
+
+    QuizSession.objects.create(
         user=request.user,
         quiz_type=quiz_type,
         score=score,
-        total_questions=total if total > 0 else 1
+        total_questions=total,
     )
-
     return Response({
-        'score': score,
-        'total': total,
-        'percentage': int((score / total) * 100) if total > 0 else 0,
-        'details': detailed_results,
-        'message': 'Quiz submitted successfully!'
-    }, status=201)
+        "quiz_type": quiz_type,
+        "score": score,
+        "total": total,
+        "percentage": round((score / total) * 100),
+        "details": details,
+        "message": "Quiz submitted successfully!",
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def quiz_history(request):
+    sessions = QuizSession.objects.filter(user=request.user).order_by("-created_at")[:20]
+    return Response([
+        {
+            "id": session.id,
+            "quiz_type": session.quiz_type,
+            "score": session.score,
+            "total_questions": session.total_questions,
+            "percentage": round((session.score / session.total_questions) * 100) if session.total_questions else 0,
+            "created_at": session.created_at,
+        }
+        for session in sessions
+    ])

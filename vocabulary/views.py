@@ -1,17 +1,17 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import status
 
-from .models import Word
-from .serializers import WordSerializer
+from .models import UserWord, Word
+from .serializers import UserWordSerializer, WordSerializer
 
 
 @api_view(["GET"])
 def get_words(request):
     """Public read-only access to curated vocabulary."""
     words = Word.objects.all().order_by("level", "english_word")
-    serializer = WordSerializer(words, many=True)
-    return Response(serializer.data)
+    return Response(WordSerializer(words, many=True).data)
 
 
 @api_view(["GET", "POST"])
@@ -19,20 +19,76 @@ def get_words(request):
 def manage_words(request):
     if request.method == "GET":
         words = Word.objects.all().order_by("level", "english_word")
-        serializer = WordSerializer(words, many=True)
-        return Response(serializer.data)
+        return Response(WordSerializer(words, many=True).data)
 
-    # Vocabulary is shared curated content, not a personal user resource.
-    # Only staff may create entries so ordinary accounts cannot alter the
-    # shared learning material for every other learner.
     if not request.user.is_staff:
         return Response(
             {"detail": "Only staff users can add shared vocabulary entries."},
-            status=403,
+            status=status.HTTP_403_FORBIDDEN,
         )
 
     serializer = WordSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
-        return Response(serializer.data, status=201)
-    return Response(serializer.errors, status=400)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def my_words(request):
+    if request.method == "GET":
+        words = UserWord.objects.filter(user=request.user)
+        return Response(UserWordSerializer(words, many=True).data)
+
+    serializer = UserWordSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    word_text = serializer.validated_data["english_word"]
+    saved = UserWord.objects.filter(user=request.user, english_word__iexact=word_text).first()
+    if saved:
+        return Response(UserWordSerializer(saved).data, status=status.HTTP_200_OK)
+    saved = serializer.save(user=request.user)
+    return Response(UserWordSerializer(saved).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["PATCH", "DELETE"])
+@permission_classes([IsAuthenticated])
+def my_word_detail(request, word_id):
+    try:
+        word = UserWord.objects.get(id=word_id, user=request.user)
+    except UserWord.DoesNotExist:
+        return Response({"detail": "Saved word not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "DELETE":
+        word.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    if "proficiency" in request.data:
+        try:
+            proficiency = int(request.data["proficiency"])
+        except (TypeError, ValueError):
+            return Response({"proficiency": "Enter an integer from 0 to 100."}, status=status.HTTP_400_BAD_REQUEST)
+        if not 0 <= proficiency <= 100:
+            return Response({"proficiency": "Enter a value from 0 to 100."}, status=status.HTTP_400_BAD_REQUEST)
+        word.proficiency = proficiency
+    if "translation" in request.data:
+        word.translation = str(request.data["translation"]).strip()[:100]
+    if "level" in request.data:
+        level = request.data["level"]
+        if level not in dict(UserWord.LEVEL_CHOICES):
+            return Response({"level": "Choose A1, B1, or C1."}, status=status.HTTP_400_BAD_REQUEST)
+        word.level = level
+    word.save()
+    return Response(UserWordSerializer(word).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def practice_word(request, word_id):
+    try:
+        word = UserWord.objects.get(id=word_id, user=request.user)
+    except UserWord.DoesNotExist:
+        return Response({"detail": "Saved word not found."}, status=status.HTTP_404_NOT_FOUND)
+    word.proficiency = min(100, word.proficiency + 20)
+    word.save(update_fields=["proficiency", "updated_at"])
+    return Response(UserWordSerializer(word).data)

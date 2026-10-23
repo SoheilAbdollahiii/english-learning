@@ -63,6 +63,15 @@ export default function App() {
   const [words, setWords] = useState([])
   const [articles, setArticles] = useState([])
   const [writings, setWritings] = useState([])
+  const [personalWords, setPersonalWords] = useState([])
+  const [readingProgress, setReadingProgress] = useState([])
+  const [quizHistory, setQuizHistory] = useState([])
+  const [preferences, setPreferences] = useState({ preferred_level: 'B1', daily_word_goal: 10, learning_goal: 'general' })
+  const [preferencesSaving, setPreferencesSaving] = useState(false)
+  const [readingQuery, setReadingQuery] = useState('')
+  const [readingLevel, setReadingLevel] = useState('all')
+  const [vocabQuery, setVocabQuery] = useState('')
+  const [vocabLevel, setVocabLevel] = useState('all')
   const [loading, setLoading] = useState(() => !!localStorage.getItem('access_token'))
   
   const [writingText, setWritingText] = useState('')
@@ -75,6 +84,7 @@ export default function App() {
   const [quizSubmitted, setQuizSubmitted] = useState(false)
   const [quizResult, setQuizResult] = useState(null)
   const [loadingQuiz, setLoadingQuiz] = useState(false)
+  const [quizType, setQuizType] = useState('vocabulary')
   
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('english-learning-theme') === 'dark')
   
@@ -91,13 +101,12 @@ export default function App() {
     for (let i = 6; i >= 0; i--) {
       const day = new Date()
       day.setDate(day.getDate() - i)
-      data.push({
-        name: currentDays[day.getDay()],
-        words: i === 0 ? words.length : Math.max(0, words.length - (i * 2))
-      })
+      const dayKey = day.toDateString()
+      const activity = quizHistory.filter((session) => new Date(session.created_at).toDateString() === dayKey).length
+      data.push({ name: currentDays[day.getDay()], activity })
     }
     return data
-  }, [i18n.language, words.length])
+  }, [i18n.language, quizHistory])
 
   useEffect(() => {
     document.documentElement.lang = i18n.language === 'fa' ? 'fa' : 'en'
@@ -152,39 +161,71 @@ export default function App() {
   useEffect(() => {
     if (!isLoggedIn) return
 
-    if (activeTab === 'dashboard') {
-      Promise.all([
-        apiFetch('http://127.0.0.1:8000/vocabulary/api/words/').then(res => res.json()),
-        apiFetch('http://127.0.0.1:8000/reading/api/articles/').then(res => res.json()),
-        apiFetch('http://127.0.0.1:8000/writing/api/writings/').then(res => res.json())
-      ]).then(([wordsData, articlesData, writingsData]) => {
-        setWords(wordsData || [])
-        setArticles(articlesData || [])
-        setWritings(writingsData || [])
+    const loadTabData = async () => {
+      setLoading(true)
+      try {
+        if (activeTab === 'dashboard') {
+          const [wordsRes, personalRes, articlesRes, writingsRes, preferencesRes, progressRes, historyRes] = await Promise.all([
+            apiFetch('http://127.0.0.1:8000/vocabulary/api/words/'),
+            apiFetch('http://127.0.0.1:8000/vocabulary/api/my-words/'),
+            apiFetch('http://127.0.0.1:8000/reading/api/articles/'),
+            apiFetch('http://127.0.0.1:8000/writing/api/writings/'),
+            apiFetch('http://127.0.0.1:8000/learning/api/preferences/'),
+            apiFetch('http://127.0.0.1:8000/reading/api/progress/'),
+            apiFetch('http://127.0.0.1:8000/quiz/api/history/')
+          ])
+          const [wordsData, personalData, articlesData, writingsData, preferencesData, progressData, historyData] = await Promise.all([
+            wordsRes.json(), personalRes.json(), articlesRes.json(), writingsRes.json(),
+            preferencesRes.json(), progressRes.json(), historyRes.json()
+          ])
+          setWords(Array.isArray(wordsData) ? wordsData : [])
+          setPersonalWords(Array.isArray(personalData) ? personalData : [])
+          setArticles(Array.isArray(articlesData) ? articlesData : [])
+          setWritings(Array.isArray(writingsData) ? writingsData : [])
+          if (preferencesRes.ok) {
+            setPreferences(preferencesData)
+            setReadingLevel(preferencesData.preferred_level)
+            setVocabLevel(preferencesData.preferred_level)
+          }
+          setReadingProgress(Array.isArray(progressData) ? progressData : [])
+          setQuizHistory(Array.isArray(historyData) ? historyData : [])
+        } else if (activeTab === 'reading') {
+          const [articlesRes, progressRes] = await Promise.all([
+            apiFetch('http://127.0.0.1:8000/reading/api/articles/'),
+            apiFetch('http://127.0.0.1:8000/reading/api/progress/')
+          ])
+          const [articlesData, progressData] = await Promise.all([articlesRes.json(), progressRes.json()])
+          setArticles(Array.isArray(articlesData) ? articlesData : [])
+          setReadingProgress(Array.isArray(progressData) ? progressData : [])
+        } else if (activeTab === 'vocabulary') {
+          const [wordsRes, personalRes] = await Promise.all([
+            apiFetch('http://127.0.0.1:8000/vocabulary/api/words/'),
+            apiFetch('http://127.0.0.1:8000/vocabulary/api/my-words/')
+          ])
+          const [wordsData, personalData] = await Promise.all([wordsRes.json(), personalRes.json()])
+          setWords(Array.isArray(wordsData) ? wordsData : [])
+          setPersonalWords(Array.isArray(personalData) ? personalData : [])
+        } else if (activeTab === 'writing') {
+          const res = await apiFetch('http://127.0.0.1:8000/writing/api/writings/')
+          const data = await res.json()
+          setWritings(Array.isArray(data) ? data : [])
+        } else if (activeTab === 'quiz') {
+          const res = await apiFetch('http://127.0.0.1:8000/quiz/api/history/')
+          const data = await res.json()
+          setQuizHistory(Array.isArray(data) ? data : [])
+        }
+      } catch (err) {
+        console.error('Could not load learning data:', err)
+      } finally {
         setLoading(false)
-      }).catch(() => setLoading(false))
-      return;
+      }
     }
 
-    let endpoint = 'http://127.0.0.1:8000/reading/api/articles/'
-    if (activeTab === 'vocabulary') endpoint = 'http://127.0.0.1:8000/vocabulary/api/words/'
-    else if (activeTab === 'writing') endpoint = 'http://127.0.0.1:8000/writing/api/writings/'
-
-    apiFetch(endpoint)
-      .then(res => res.json())
-      .then(data => {
-        if (activeTab === 'vocabulary') setWords(data || [])
-        else if (activeTab === 'reading') setArticles(data || [])
-        else if (activeTab === 'writing') setWritings(data || [])
-        setLoading(false)
-      })
-      .catch(err => {
-        console.error("API Error:", err)
-        setLoading(false)
-      })
+    loadTabData()
   }, [activeTab, isLoggedIn])
 
   const startQuiz = async (type = 'vocabulary') => {
+    setQuizType(type)
     setLoadingQuiz(true)
     setQuizSubmitted(false)
     setQuizResult(null)
@@ -193,12 +234,16 @@ export default function App() {
 
     try {
       const res = await apiFetch(`http://127.0.0.1:8000/quiz/api/questions/?type=${type}`)
+      const data = await res.json()
       if (res.ok) {
-        const data = await res.json()
-        setQuizQuestions(data || [])
+        setQuizQuestions(Array.isArray(data) ? data : [])
+      } else {
+        setQuizQuestions([])
+        alert(data.detail || t('quiz_load_failed'))
       }
     } catch (err) {
       console.error('Error fetching quiz questions:', err)
+      alert(t('quiz_load_failed'))
     } finally {
       setLoadingQuiz(false)
     }
@@ -221,15 +266,20 @@ export default function App() {
       const res = await apiFetch('http://127.0.0.1:8000/quiz/api/submit/', {
         method: 'POST',
         body: JSON.stringify({
-          quiz_type: 'vocabulary',
+          quiz_type: quizType,
           answers: finalAnswers
         })
       });
 
+      const resultData = await res.json()
       if (res.ok) {
-        const resultData = await res.json();
-        setQuizResult(resultData);
-        setQuizSubmitted(true);
+        setQuizResult(resultData)
+        setQuizSubmitted(true)
+        const historyRes = await apiFetch('http://127.0.0.1:8000/quiz/api/history/')
+        const historyData = await historyRes.json()
+        setQuizHistory(Array.isArray(historyData) ? historyData : [])
+      } else {
+        alert(resultData.detail || t('quiz_submit_failed'))
       }
     } catch (err) {
       console.error('Error submitting quiz:', err);
@@ -248,24 +298,137 @@ export default function App() {
   }, [isLoggedIn, streak]);
 
   const handleWordClick = async (word) => {
-    const mockTranslation = "ترجمه: " + word; 
+    const cleanedWord = word.replace(/^[^a-zA-Z'-]+|[^a-zA-Z'-]+$/g, '').toLowerCase()
+    if (!cleanedWord) return
     try {
-      const res = await apiFetch('http://127.0.0.1:8000/vocabulary/api/words/', {
+      const res = await apiFetch('http://127.0.0.1:8000/vocabulary/api/my-words/', {
         method: 'POST',
-        body: JSON.stringify({
-          english_word: word,
-          translation: mockTranslation,
-          level: 'B1',
-          proficiency: 10
-        })
-      });
+        body: JSON.stringify({ english_word: cleanedWord, level: preferences.preferred_level || 'B1' })
+      })
+      const data = await res.json()
       if (res.ok) {
-        alert(t('word_saved', { word }));
+        setPersonalWords((current) => [data, ...current.filter((item) => item.id !== data.id)])
+        alert(t('word_saved', { word: cleanedWord }))
+      } else {
+        alert(t('word_save_failed'))
       }
     } catch (err) {
-      console.error('Error saving word:', err);
+      console.error('Error saving personal word:', err)
+      alert(t('word_save_failed'))
+    }
+  }
+
+  const savePreferences = async (event) => {
+    event.preventDefault()
+    setPreferencesSaving(true)
+    try {
+      const res = await apiFetch('http://127.0.0.1:8000/learning/api/preferences/', {
+        method: 'PATCH',
+        body: JSON.stringify(preferences)
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setPreferences(data)
+        setReadingLevel(data.preferred_level)
+        setVocabLevel(data.preferred_level)
+        alert(t('preferences_saved'))
+      } else {
+        alert(t('preferences_failed'))
+      }
+    } catch (err) {
+      console.error('Could not save learning preferences:', err)
+      alert(t('preferences_failed'))
+    } finally {
+      setPreferencesSaving(false)
+    }
+  }
+
+  const markArticleRead = async (articleId, completed) => {
+    try {
+      const res = await apiFetch('http://127.0.0.1:8000/reading/api/progress/', {
+        method: 'POST',
+        body: JSON.stringify({ article_id: articleId, completed })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setReadingProgress((current) => [data, ...current.filter((item) => item.article_id !== articleId)])
+      }
+    } catch (err) {
+      console.error('Could not save reading progress:', err)
+    }
+  }
+
+  const saveCuratedWord = async (word) => {
+    try {
+      const res = await apiFetch('http://127.0.0.1:8000/vocabulary/api/my-words/', {
+        method: 'POST',
+        body: JSON.stringify({ english_word: word.english_word, translation: word.translation || '', level: word.level || preferences.preferred_level || 'B1' })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setPersonalWords((current) => [data, ...current.filter((item) => item.id !== data.id)])
+        alert(t('word_saved', { word: data.english_word }))
+      } else {
+        alert(t('word_save_failed'))
+      }
+    } catch (err) {
+      console.error('Could not save curated word:', err)
+      alert(t('word_save_failed'))
+    }
+  }
+
+  const practiceWord = async (word) => {
+    if (!word.isPersonal) return
+    try {
+      const res = await apiFetch(`http://127.0.0.1:8000/vocabulary/api/my-words/${word.id}/practice/`, { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        setPersonalWords((current) => current.map((item) => item.id === data.id ? data : item))
+      }
+    } catch (err) {
+      console.error('Could not update word mastery:', err)
+    }
+  }
+
+  const updateWordTranslation = async (word, translation) => {
+    try {
+      const res = await apiFetch(`http://127.0.0.1:8000/vocabulary/api/my-words/${word.id}/`, {
+        method: 'PATCH',
+        body: JSON.stringify({ translation })
+      })
+      const data = await res.json()
+      if (res.ok) setPersonalWords((current) => current.map((item) => item.id === data.id ? data : item))
+    } catch (err) {
+      console.error('Could not update word translation:', err)
+    }
+  }
+
+  const deletePersonalWord = async (word) => {
+    try {
+      const res = await apiFetch(`http://127.0.0.1:8000/vocabulary/api/my-words/${word.id}/`, { method: 'DELETE' })
+      if (res.ok) setPersonalWords((current) => current.filter((item) => item.id !== word.id))
+    } catch (err) {
+      console.error('Could not delete saved word:', err)
     }
   };
+
+  const dailyWordsAdded = personalWords.filter((word) => new Date(word.created_at).toDateString() === new Date().toDateString()).length
+  const dailyGoalPercent = Math.min(100, Math.round((dailyWordsAdded / Math.max(1, Number(preferences.daily_word_goal) || 1)) * 100))
+
+  const filteredArticles = articles.filter((article) => {
+    const matchesQuery = `${article.title} ${article.content}`.toLowerCase().includes(readingQuery.trim().toLowerCase())
+    return matchesQuery && (readingLevel === 'all' || article.level === readingLevel)
+  })
+
+  const vocabularyItems = [
+    ...personalWords.map((word) => ({ ...word, isPersonal: true, key: `personal-${word.id}` })),
+    ...words
+      .filter((word) => !personalWords.some((saved) => saved.english_word.toLowerCase() === word.english_word.toLowerCase()))
+      .map((word) => ({ ...word, isPersonal: false, key: `curated-${word.id}` })),
+  ].filter((word) => {
+    const matchesQuery = `${word.english_word} ${word.translation || ''}`.toLowerCase().includes(vocabQuery.trim().toLowerCase())
+    return matchesQuery && (vocabLevel === 'all' || word.level === vocabLevel)
+  })
 
   const handleWritingSubmit = async (e) => {
     e.preventDefault();
@@ -330,7 +493,7 @@ export default function App() {
     <div className={`min-h-screen font-sans transition-colors duration-300 ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`} dir={i18n.language === 'fa' ? 'rtl' : 'ltr'}>
       <nav className={`shadow-sm border-b sticky top-0 z-10 transition-colors duration-300 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-16 items-center">
+            <div className="flex flex-wrap justify-between min-h-16 items-center gap-3 py-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-xl">A</span>
@@ -338,7 +501,7 @@ export default function App() {
                 <span className={`font-extrabold text-xl ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t('app_title')}</span>
               </div>
               
-              <div className="flex gap-3 sm:gap-6">
+              <div className="order-3 flex w-full max-w-full gap-3 overflow-x-auto whitespace-nowrap sm:order-none sm:w-auto sm:gap-6">
                 <button onClick={() => changeTab('dashboard')} className={`px-1 pt-1 border-b-2 text-sm font-bold transition-colors ${activeTab === 'dashboard' ? 'border-indigo-600 text-indigo-500' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
                   {t('tab_dashboard')}
                 </button>
@@ -391,10 +554,10 @@ export default function App() {
           <>
             {activeTab === 'dashboard' && (
               <div className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
                   <div className={`p-6 rounded-2xl shadow-sm border flex flex-col justify-center items-center transition-shadow ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                     <h3 className="text-gray-400 font-bold mb-2">{t('vocab_title')}</h3>
-                    <p className="text-5xl font-black text-indigo-500">{words.length}</p>
+                    <p className="text-5xl font-black text-indigo-500">{personalWords.length}</p>
                   </div>
                   <div className={`p-6 rounded-2xl shadow-sm border flex flex-col justify-center items-center transition-shadow ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                     <h3 className="text-gray-400 font-bold mb-2">{t('tab_reading')}</h3>
@@ -404,11 +567,45 @@ export default function App() {
                     <h3 className="text-gray-400 font-bold mb-2">{t('daily_streak')}</h3>
                     <p className="text-5xl font-black text-orange-500">{streak} ⚡</p>
                   </div>
+                  <div className={`p-6 rounded-2xl shadow-sm border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                    <h3 className="text-gray-400 font-bold mb-3">{t('daily_goal_progress')}</h3>
+                    <p className="text-2xl font-black text-indigo-500">{dailyWordsAdded} / {preferences.daily_word_goal}</p>
+                    <div className={`w-full rounded-full h-2.5 mt-4 overflow-hidden ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                      <div className="bg-indigo-600 h-2.5 rounded-full transition-all" style={{ width: `${dailyGoalPercent}%` }}></div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">{t('words_added_today')}</p>
+                  </div>
                 </div>
-                
+
+                <form onSubmit={savePreferences} className={`p-6 rounded-2xl shadow-sm border space-y-5 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                  <div>
+                    <h3 className="text-lg font-bold">{t('learning_preferences')}</h3>
+                    <p className="text-sm text-gray-500 mt-1">{t('learning_preferences_desc')}</p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <label className="block text-sm font-semibold">
+                      <span className="block mb-2">{t('preferred_level')}</span>
+                      <select value={preferences.preferred_level} onChange={(event) => setPreferences((current) => ({ ...current, preferred_level: event.target.value }))} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`}>
+                        <option value="A1">A1 — Beginner</option><option value="B1">B1 — Intermediate</option><option value="C1">C1 — Advanced</option>
+                      </select>
+                    </label>
+                    <label className="block text-sm font-semibold">
+                      <span className="block mb-2">{t('daily_word_goal')}</span>
+                      <input type="number" min="1" max="100" value={preferences.daily_word_goal} onChange={(event) => setPreferences((current) => ({ ...current, daily_word_goal: Number(event.target.value) }))} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`} />
+                    </label>
+                    <label className="block text-sm font-semibold">
+                      <span className="block mb-2">{t('learning_goal')}</span>
+                      <select value={preferences.learning_goal} onChange={(event) => setPreferences((current) => ({ ...current, learning_goal: event.target.value }))} className={`w-full rounded-xl border p-3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`}>
+                        <option value="general">{t('goal_general')}</option><option value="travel">{t('goal_travel')}</option><option value="work">{t('goal_work')}</option><option value="exam">{t('goal_exam')}</option>
+                      </select>
+                    </label>
+                  </div>
+                  <button type="submit" disabled={preferencesSaving} className="rounded-xl bg-indigo-600 px-5 py-3 font-bold text-white disabled:opacity-50">{preferencesSaving ? t('saving') : t('save_preferences')}</button>
+                </form>
+
                 <div className={`p-6 rounded-2xl shadow-sm border h-96 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                   <h3 className={`text-lg font-bold mb-6 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                    {t('activity_last_7_days')}
+                    {t('quiz_activity_last_7_days')}
                   </h3>
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData}>
@@ -422,7 +619,7 @@ export default function App() {
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontWeight: 'bold'}} />
                       <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af'}} allowDecimals={false} />
                       <RechartsTooltip contentStyle={{backgroundColor: darkMode ? '#1f2937' : '#ffffff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                      <Area type="monotone" dataKey="words" stroke="#4f46e5" strokeWidth={3} fillOpacity={1} fill="url(#colorWords)" />
+                      <Area type="monotone" dataKey="activity" stroke="#4f46e5" strokeWidth={3} fillOpacity={1} fill="url(#colorWords)" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -430,28 +627,53 @@ export default function App() {
             )}
 
             {activeTab === 'reading' && (
-              articles.length === 0 ? <EmptyState message={t('no_articles')} darkMode={darkMode} /> : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {articles.map((article) => (
+              <div className="space-y-5">
+                <div className={`grid grid-cols-1 md:grid-cols-[1fr_180px] gap-3 p-4 rounded-2xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                  <input value={readingQuery} onChange={(event) => setReadingQuery(event.target.value)} placeholder={t('search_articles')} className={`w-full rounded-xl border px-4 py-3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`} />
+                  <select value={readingLevel} onChange={(event) => setReadingLevel(event.target.value)} aria-label={t('filter_by_level')} className={`rounded-xl border px-3 py-3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`}>
+                    <option value="all">{t('all_levels')}</option><option value="A1">A1</option><option value="B1">B1</option><option value="C1">C1</option>
+                  </select>
+                </div>
+                {filteredArticles.length === 0 ? <EmptyState message={t('no_articles')} darkMode={darkMode} /> : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {filteredArticles.map((article) => (
                     <article key={article.id} className={`rounded-2xl shadow-sm border flex flex-col overflow-hidden ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                       <div className="h-2 bg-indigo-500"></div>
                       <div className="p-6 flex flex-col flex-grow">
-                        <h2 className={`text-xl font-bold mb-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>{article.title}</h2>
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{article.title}</h2>
+                          <span className="shrink-0 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-600">{article.level}</span>
+                        </div>
                         <div className="mb-6 flex-grow text-sm">
                           <InteractiveText text={article.content} onWordClick={handleWordClick} darkMode={darkMode} />
+                        </div>
+                        <div className="mt-auto border-t pt-4 dark:border-gray-700">
+                          {readingProgress.some((item) => item.article_id === article.id && item.completed) ? (
+                            <button onClick={() => markArticleRead(article.id, false)} className="w-full rounded-xl border border-green-500 px-4 py-2 text-sm font-bold text-green-600">{t('mark_unread')}</button>
+                          ) : (
+                            <button onClick={() => markArticleRead(article.id, true)} className="w-full rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">{t('mark_read')}</button>
+                          )}
                         </div>
                       </div>
                     </article>
                   ))}
                 </div>
-              )
+                )}
+              </div>
             )}
 
             {activeTab === 'vocabulary' && (
-              words.length === 0 ? <EmptyState message={t('no_words')} darkMode={darkMode} /> : (
+              <div className="space-y-5">
+                <div className={`grid grid-cols-1 md:grid-cols-[1fr_180px] gap-3 p-4 rounded-2xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                  <input value={vocabQuery} onChange={(event) => setVocabQuery(event.target.value)} placeholder={t('search_words')} className={`w-full rounded-xl border px-4 py-3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`} />
+                  <select value={vocabLevel} onChange={(event) => setVocabLevel(event.target.value)} aria-label={t('filter_by_level')} className={`rounded-xl border px-3 py-3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`}>
+                    <option value="all">{t('all_levels')}</option><option value="A1">A1</option><option value="B1">B1</option><option value="C1">C1</option>
+                  </select>
+                </div>
+                {vocabularyItems.length === 0 ? <EmptyState message={t('no_words')} darkMode={darkMode} /> : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {words.map((word) => (
-                    <div key={word.id} className={`rounded-2xl shadow-sm p-6 border flex flex-col relative overflow-hidden ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                  {vocabularyItems.map((word) => (
+                    <div key={word.key} className={`rounded-2xl shadow-sm p-6 border flex flex-col relative overflow-hidden ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                       <div className={`absolute top-0 right-0 w-16 h-16 rounded-bl-full -z-10 ${darkMode ? 'bg-indigo-950/50' : 'bg-indigo-50'}`}></div>
                       
                       <div className="flex justify-between items-start mb-1">
@@ -461,7 +683,9 @@ export default function App() {
                         </span>
                       </div>
                       
-                      <p className="text-indigo-500 font-bold mb-6">{word.translation}</p>
+                      {word.isPersonal ? (
+                        <input aria-label={t('translation')} defaultValue={word.translation} onBlur={(event) => { if (event.target.value !== word.translation) updateWordTranslation(word, event.target.value) }} placeholder={t('add_translation')} className={`w-full rounded-lg border px-3 py-2 text-sm text-indigo-500 mb-6 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`} />
+                      ) : <p className="text-indigo-500 font-bold mb-6">{word.translation}</p>}
                       
                       <div className="mt-auto">
                         <div className="flex justify-between text-xs font-bold mb-2">
@@ -475,14 +699,20 @@ export default function App() {
                           ></div>
                         </div>
                         
-                        <button className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm">
-                          {t('practice')}
-                        </button>
+                        {word.isPersonal ? (
+                          <div className="flex gap-2">
+                            <button onClick={() => practiceWord(word)} disabled={(word.proficiency || 0) >= 100} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm disabled:opacity-50">{t('practice')}</button>
+                            <button onClick={() => deletePersonalWord(word)} aria-label={t('delete_word')} className="px-3 py-2 rounded-xl border border-red-300 text-red-500">{t('delete')}</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => saveCuratedWord(word)} className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm">{t('save_to_my_words')}</button>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
-              )
+                )}
+              </div>
             )}
 
             {activeTab === 'writing' && (
@@ -558,13 +788,29 @@ export default function App() {
                     <p className="text-gray-500 text-sm">
                       {t('quiz_intro')}
                     </p>
-                    <button 
-                      onClick={() => startQuiz('vocabulary')}
-                      disabled={loadingQuiz}
-                      className="py-3 px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-colors shadow-sm"
-                    >
-                      {loadingQuiz ? t('loading') : t('start_vocabulary_quiz')}
-                    </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {[
+                        ['vocabulary', 'quiz_vocabulary'],
+                        ['reading', 'quiz_reading'],
+                        ['grammar', 'quiz_grammar'],
+                      ].map(([type, label]) => (
+                        <button key={type} onClick={() => startQuiz(type)} disabled={loadingQuiz} className="py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-colors shadow-sm disabled:opacity-50">
+                          {loadingQuiz && quizType === type ? t('loading') : t(label)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!quizQuestions.length && !quizSubmitted && quizHistory.length > 0 && (
+                  <div className={`p-6 rounded-2xl border space-y-3 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                    <h4 className="font-bold">{t('quiz_history')}</h4>
+                    {quizHistory.slice(0, 5).map((session) => (
+                      <div key={session.id} className="flex items-center justify-between gap-4 border-b last:border-0 border-gray-200 dark:border-gray-700 py-2 text-sm">
+                        <span>{t(`quiz_${session.quiz_type}`)} · {new Date(session.created_at).toLocaleDateString(i18n.language === 'fa' ? 'fa-IR' : 'en-US')}</span>
+                        <span className="font-bold text-indigo-500">{session.score}/{session.total_questions} ({session.percentage}%)</span>
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -646,7 +892,7 @@ export default function App() {
 
                     <div className="text-center pt-2">
                       <button 
-                        onClick={() => setQuizQuestions([])}
+                        onClick={() => { setQuizQuestions([]); setQuizSubmitted(false); setQuizResult(null); setCurrentQuestionIndex(0); setQuizAnswers({}) }}
                         className="py-3 px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-colors shadow-sm"
                       >
                         {t('take_another_quiz')}

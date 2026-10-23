@@ -11,6 +11,29 @@ An English-learning application with a Django REST API, a React learning interfa
 - **Light and dark themes:** Theme choice is persisted in the browser.
 - **Private submissions:** Writing submissions and their feedback are scoped to the authenticated user.
 
+## Stage 3 learning features
+
+- **Responsive learning interface:** Search and level filters for Reading and Vocabulary, plus responsive navigation and the existing Persian/English and light/dark controls.
+- **Personal vocabulary:** Learners can save words from a reading passage or from the curated bank, add their own translation, practice saved words to increase mastery, and delete personal entries. Personal words are isolated by account; they are not added to the shared bank.
+- **Personal learning plan:** The authenticated learner can save a preferred CEFR level, a daily word target (1–100), and a learning goal (general English, travel, work, or exam preparation).
+- **Reading progress:** Articles can be searched and filtered by level, and read/unread status is persisted per learner.
+- **Skill quizzes:** Separate vocabulary, reading, and grammar quizzes are seeded by a data migration. Results include explanations and are saved to a private per-user history.
+- **Progress data:** The dashboard chart is based on saved quiz sessions, not a fabricated activity curve.
+
+### Stage 3 API routes
+
+- `GET /vocabulary/api/words/` — curated shared vocabulary (authenticated)
+- `GET|POST /vocabulary/api/my-words/` — list or save the current user's words
+- `PATCH|DELETE /vocabulary/api/my-words/<id>/` — update translation/level/mastery or remove an owned word
+- `POST /vocabulary/api/my-words/<id>/practice/` — increase personal word mastery by 20 points, capped at 100
+- `GET /reading/api/articles/?q=<search>&level=A1` — search and filter reading content
+- `GET|POST /reading/api/progress/` — read or update per-user article progress
+- `GET|PATCH /learning/api/preferences/` — retrieve or update personal learning settings
+- `GET /quiz/api/questions/?type=vocabulary|reading|grammar` — fetch a quiz (answers are not exposed)
+- `POST /quiz/api/submit/` and `GET /quiz/api/history/` — submit answers and view the current user's recent results
+
+Run `python manage.py migrate` after pulling the changes so the personal data tables and starter quiz questions are created. The new endpoints require the same JWT login used by the React client.
+
 ## Requirements
 
 - Python 3.12 (used by CI)
