@@ -41,6 +41,10 @@ export default function App() {
   const [loadingQuiz, setLoadingQuiz] = useState(false)
   const [quizType, setQuizType] = useState('vocabulary')
   const [quizLevel, setQuizLevel] = useState('B1')
+  const [quizTimerEnabled, setQuizTimerEnabled] = useState(false)
+  const [quizTimeLeft, setQuizTimeLeft] = useState(90)
+  const [quizTimeExpired, setQuizTimeExpired] = useState(false)
+  const [quizError, setQuizError] = useState('')
   
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('english-learning-theme') === 'dark')
   
@@ -76,6 +80,16 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('english-learning-theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
+
+  useEffect(() => {
+    if (!quizTimerEnabled || !quizQuestions.length || quizSubmitted || quizTimeExpired) return undefined
+    if (quizTimeLeft <= 0) {
+      setQuizTimeExpired(true)
+      return undefined
+    }
+    const timer = window.setTimeout(() => setQuizTimeLeft((remaining) => Math.max(0, remaining - 1)), 1000)
+    return () => window.clearTimeout(timer)
+  }, [quizTimerEnabled, quizQuestions.length, quizSubmitted, quizTimeExpired, quizTimeLeft])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -249,46 +263,61 @@ export default function App() {
   }
 
   const handleAnswerSelect = (questionId, optionKey) => {
-    const updatedAnswers = { ...quizAnswers, [questionId]: optionKey };
-    setQuizAnswers(updatedAnswers);
+    setQuizAnswers((current) => ({ ...current, [questionId]: optionKey }))
+    setQuizError('')
+  }
 
-    if (currentQuestionIndex < quizQuestions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else {
-      submitQuizFinal(updatedAnswers);
+  const submitQuizFinal = async (finalAnswers = quizAnswers, { allowPartial = false } = {}) => {
+    if (loadingQuiz) return
+    const answeredCount = Object.keys(finalAnswers).length
+    if (answeredCount === 0) {
+      setQuizError(t('quiz_answer_required'))
+      return
     }
-  };
+    if (!allowPartial && answeredCount < quizQuestions.length) {
+      setQuizError(t('quiz_all_answered'))
+      return
+    }
 
-  const submitQuizFinal = async (finalAnswers) => {
-    setLoadingQuiz(true);
+    setLoadingQuiz(true)
+    setQuizError('')
     try {
       const res = await apiFetch(apiUrl('/quiz/api/submit/'), {
         method: 'POST',
         body: JSON.stringify({
           quiz_type: quizType,
           level: quizLevel,
-          answers: finalAnswers
-        })
-      });
+          answers: finalAnswers,
+        }),
+      })
+      const resultData = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setQuizError(resultData.detail || resultData.answers || t('quiz_submit_failed'))
+        return
+      }
 
-      const resultData = await res.json()
-      if (res.ok) {
-        setQuizResult(resultData)
-        setQuizSubmitted(true)
+      setQuizResult(resultData)
+      setQuizSubmitted(true)
+      setQuizTimeExpired(false)
+
+      try {
         const [historyRes, statsRes] = await Promise.all([
           apiFetch(apiUrl('/quiz/api/history/')),
-          apiFetch(apiUrl('/quiz/api/stats/'))
+          apiFetch(apiUrl('/quiz/api/stats/')),
         ])
-        const [historyData, statsData] = await Promise.all([historyRes.json(), statsRes.json()])
-        setQuizHistory(Array.isArray(historyData) ? historyData : [])
+        const historyData = await historyRes.json()
+        const statsData = await statsRes.json()
+        if (historyRes.ok) setQuizHistory(Array.isArray(historyData) ? historyData : [])
         if (statsRes.ok) setQuizStats(statsData)
-      } else {
-        alert(resultData.detail || t('quiz_submit_failed'))
+      } catch (refreshError) {
+        // The submitted result is already saved; a history refresh failure must not hide it.
+        console.error('Quiz was submitted, but refreshing quiz history failed:', refreshError)
       }
     } catch (err) {
-      console.error('Error submitting quiz:', err);
+      console.error('Error submitting quiz:', err)
+      setQuizError(t('quiz_submit_failed'))
     } finally {
-      setLoadingQuiz(false);
+      setLoadingQuiz(false)
     }
   };
 
@@ -881,19 +910,24 @@ export default function App() {
               </div>
             )}
 
-            {/* ---------------- تب کوئیز همراه با نمایش توضیحات ---------------- */}
             {activeTab === 'quiz' && (
               <div className="max-w-2xl mx-auto space-y-6">
                 {!quizQuestions.length && !quizSubmitted && (
                   <div className={`p-8 rounded-3xl shadow-sm border text-center space-y-6 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-                    <div className="text-5xl">🎯</div>
-                    <h3 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {t('ready_quiz')}
-                    </h3>
-                    <p className="text-gray-500 text-sm">
-                      {t('quiz_intro')}
-                    </p>
+                    <div className="text-5xl" aria-hidden="true">🎯</div>
+                    <h3 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t('ready_quiz')}</h3>
+                    <p className="text-gray-500 text-sm">{t('quiz_intro')}</p>
                     <p className="text-xs font-bold text-indigo-500">{t('preferred_level')}: {preferences.preferred_level || 'B1'}</p>
+                    <label className={`inline-flex items-center justify-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold ${darkMode ? 'border-gray-700 bg-gray-900/40 text-gray-200' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>
+                      <input
+                        type="checkbox"
+                        checked={quizTimerEnabled}
+                        onChange={(event) => setQuizTimerEnabled(event.target.checked)}
+                        disabled={loadingQuiz}
+                        className="h-4 w-4 accent-indigo-600"
+                      />
+                      {t('quiz_timed_mode')}
+                    </label>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {[
                         ['vocabulary', 'quiz_vocabulary'],
@@ -921,10 +955,24 @@ export default function App() {
                 )}
 
                 {quizQuestions.length > 0 && !quizSubmitted && (
-                  <div className={`p-8 rounded-3xl shadow-sm border space-y-6 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-                    <div className="flex justify-between items-center text-xs font-bold text-gray-400">
+                  <div className={`p-6 sm:p-8 rounded-3xl shadow-sm border space-y-6 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                    <div className="flex flex-wrap justify-between items-center gap-3 text-xs font-bold text-gray-400">
                       <span>{t('question_counter', { current: currentQuestionIndex + 1, total: quizQuestions.length })}</span>
-                      <span>{quizQuestions[currentQuestionIndex].level}</span>
+                      <span className="rounded-lg bg-indigo-50 dark:bg-indigo-950 px-3 py-1 text-indigo-600 dark:text-indigo-300">{quizQuestions[currentQuestionIndex].level}</span>
+                      {quizTimerEnabled && (
+                        <span role="timer" aria-live="off" className={`rounded-lg px-3 py-1 tabular-nums ${quizTimeLeft <= 15 || quizTimeExpired ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'}`}>
+                          ⏱ {Math.floor(quizTimeLeft / 60).toString().padStart(2, '0')}:{(quizTimeLeft % 60).toString().padStart(2, '0')}
+                        </span>
+                      )}
+                    </div>
+
+                    <div>
+                      <div className={`h-2.5 w-full overflow-hidden rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`} role="progressbar" aria-label={t('quiz_progress')} aria-valuemin={0} aria-valuemax={quizQuestions.length} aria-valuenow={currentQuestionIndex + 1}>
+                        <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-300" style={{ width: `${((currentQuestionIndex + 1) / quizQuestions.length) * 100}%` }} />
+                      </div>
+                      <p className={`mt-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {t('quiz_answered_count', { answered: Object.keys(quizAnswers).length, total: quizQuestions.length })}
+                      </p>
                     </div>
 
                     <h4 className={`text-xl font-bold text-justify ${darkMode ? 'text-white' : 'text-gray-900'}`} dir="ltr">
@@ -933,33 +981,86 @@ export default function App() {
 
                     <div className="space-y-3" dir="ltr">
                       {['A', 'B', 'C', 'D'].map((optKey) => {
-                        const optText = quizQuestions[currentQuestionIndex][`option_${optKey.toLowerCase()}`];
-                        if (!optText) return null;
+                        const currentQuestion = quizQuestions[currentQuestionIndex]
+                        const optText = currentQuestion[`option_${optKey.toLowerCase()}`]
+                        if (!optText) return null
+                        const selected = quizAnswers[currentQuestion.id] === optKey
                         return (
                           <button
+                            type="button"
                             key={optKey}
-                            onClick={() => handleAnswerSelect(quizQuestions[currentQuestionIndex].id, optKey)}
-                            className={`w-full text-left p-4 rounded-2xl border font-bold transition-all ${
-                              darkMode 
-                                ? 'bg-gray-700 border-gray-600 hover:bg-indigo-900/50 hover:border-indigo-500 text-white' 
-                                : 'bg-gray-50 border-gray-200 hover:bg-indigo-50 hover:border-indigo-300 text-gray-800'
+                            aria-pressed={selected}
+                            disabled={quizTimeExpired || loadingQuiz}
+                            onClick={() => handleAnswerSelect(currentQuestion.id, optKey)}
+                            className={`w-full text-left p-4 rounded-2xl border font-bold transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
+                              selected
+                                ? (darkMode ? 'bg-indigo-900/60 border-indigo-400 ring-2 ring-indigo-500/40 text-white' : 'bg-indigo-50 border-indigo-500 ring-2 ring-indigo-200 text-indigo-900')
+                                : (darkMode ? 'bg-gray-700 border-gray-600 hover:bg-indigo-900/50 hover:border-indigo-500 text-white' : 'bg-gray-50 border-gray-200 hover:bg-indigo-50 hover:border-indigo-300 text-gray-800')
                             }`}
                           >
                             <span className="inline-block w-8 text-indigo-500">{optKey}.</span> {optText}
                           </button>
-                        );
+                        )
                       })}
+                    </div>
+
+                    {quizTimeExpired && (
+                      <div role="status" className={`rounded-xl border p-4 text-sm ${darkMode ? 'border-amber-800 bg-amber-950/30 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                        {t('quiz_time_up')}
+                        {Object.keys(quizAnswers).length === 0 && (
+                          <button type="button" onClick={() => { setQuizTimerEnabled(false); setQuizTimeExpired(false); setQuizTimeLeft(90); setQuizError('') }} className="mt-3 block font-bold underline">
+                            {t('quiz_continue_untimed')}
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {quizError && (
+                      <p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+                        {quizError}
+                      </p>
+                    )}
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
+                      <button
+                        type="button"
+                        disabled={currentQuestionIndex === 0 || loadingQuiz}
+                        onClick={() => { setCurrentQuestionIndex((index) => Math.max(0, index - 1)); setQuizError('') }}
+                        className={`rounded-xl border px-4 py-2.5 text-sm font-bold disabled:opacity-40 ${darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'}`}
+                      >
+                        {t('quiz_previous_question')}
+                      </button>
+                      {currentQuestionIndex < quizQuestions.length - 1 ? (
+                        <button
+                          type="button"
+                          disabled={quizTimeExpired || loadingQuiz}
+                          onClick={() => { setCurrentQuestionIndex((index) => Math.min(quizQuestions.length - 1, index + 1)); setQuizError('') }}
+                          className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                          {t('quiz_next_question')}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={loadingQuiz}
+                          onClick={() => submitQuizFinal(quizAnswers, { allowPartial: quizTimeExpired })}
+                          className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                          {loadingQuiz ? t('loading') : t('quiz_finish')}
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
 
                 {quizSubmitted && quizResult && (
-                  <div className={`p-8 rounded-3xl shadow-sm border space-y-6 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                  <div className={`p-6 sm:p-8 rounded-3xl shadow-sm border space-y-6 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                     <div className="text-center space-y-4">
-                      <div className="text-5xl">🏆</div>
-                      <h3 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {t('quiz_completed')}
-                      </h3>
+                      <div className="text-5xl" aria-hidden="true">{quizResult.percentage >= 80 ? '🏆' : quizResult.percentage >= 50 ? '🎯' : '💪'}</div>
+                      <h3 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t('quiz_completed')}</h3>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        {t('quiz_answered_count', { answered: quizResult.total, total: quizQuestions.length })}
+                      </p>
                       <div className="flex justify-center gap-8 py-2">
                         <div>
                           <span className="block text-gray-400 text-xs font-bold">{t('score')}</span>
@@ -972,33 +1073,53 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* بخش مرور پاسخ‌ها و توضیحات آموزشی */}
                     <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                      <h4 className={`font-bold text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                        {t('explanations_review')}: 
-                      </h4>
-                      {quizResult.details.map((item, idx) => (
-                        <div key={idx} className={`p-4 rounded-xl border text-sm space-y-2 ${
-                          item.is_correct 
-                            ? (darkMode ? 'bg-green-950/20 border-green-900/50' : 'bg-green-50 border-green-200')
-                            : (darkMode ? 'bg-red-950/20 border-red-900/50' : 'bg-red-50 border-red-200')
-                        }`}>
-                          <div className="flex justify-between font-bold" dir="ltr">
-                            <span className={darkMode ? 'text-white' : 'text-gray-800'}>{idx + 1}. {item.question_text}</span>
-                            <span className={item.is_correct ? 'text-green-500' : 'text-red-500'}>
-                              {item.is_correct ? `✓ ${t('correct')}` : `✗ ${t('correct_was', { answer: item.correct_answer })}`}
-                            </span>
+                      <h4 className={`font-bold text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{t('explanations_review')}</h4>
+                      {quizResult.details.map((item, idx) => {
+                        const sourceQuestion = quizQuestions.find((question) => question.id === item.question_id)
+                        const chosenText = sourceQuestion && sourceQuestion[`option_${String(item.user_answer).toLowerCase()}`]
+                        const correctText = sourceQuestion && sourceQuestion[`option_${String(item.correct_answer).toLowerCase()}`]
+                        return (
+                          <div key={item.question_id} className={`p-4 rounded-xl border text-sm space-y-3 ${
+                            item.is_correct
+                              ? (darkMode ? 'bg-green-950/20 border-green-900/50' : 'bg-green-50 border-green-200')
+                              : (darkMode ? 'bg-red-950/20 border-red-900/50' : 'bg-red-50 border-red-200')
+                          }`}>
+                            <div className="flex flex-wrap justify-between gap-2 font-bold" dir="ltr">
+                              <span className={darkMode ? 'text-white' : 'text-gray-800'}>{idx + 1}. {item.question_text}</span>
+                              <span className={item.is_correct ? 'text-green-500' : 'text-red-500'}>
+                                {item.is_correct ? `✓ ${t('correct')}` : `✗ ${t('correct_was', { answer: item.correct_answer })}`}
+                              </span>
+                            </div>
+                            <p className={`text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} dir="ltr">
+                              <strong>{t('your_answer')}:</strong> {item.user_answer}{chosenText ? ` — ${chosenText}` : ''}
+                            </p>
+                            {!item.is_correct && correctText && (
+                              <p className={`text-xs font-medium ${darkMode ? 'text-green-300' : 'text-green-700'}`} dir="ltr">
+                                <strong>{t('correct')}:</strong> {correctText}
+                              </p>
+                            )}
+                            <p className={`text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                              💡 <span className="font-bold">{t('explanation')}:</span> {item.explanation}
+                            </p>
                           </div>
-                          <p className={`text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                            💡 <span className="font-bold">{t('explanation')}:</span> {item.explanation}
-                          </p>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
 
                     <div className="text-center pt-2">
-                      <button 
-                        onClick={() => { setQuizQuestions([]); setQuizSubmitted(false); setQuizResult(null); setCurrentQuestionIndex(0); setQuizAnswers({}) }}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuizQuestions([])
+                          setQuizSubmitted(false)
+                          setQuizResult(null)
+                          setCurrentQuestionIndex(0)
+                          setQuizAnswers({})
+                          setQuizError('')
+                          setQuizTimeExpired(false)
+                          setQuizTimeLeft(90)
+                        }}
                         className="py-3 px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-colors shadow-sm"
                       >
                         {t('take_another_quiz')}
