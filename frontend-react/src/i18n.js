@@ -276,7 +276,13 @@ const resources = {
       delete: "Delete",
       save_to_my_words: "Save to my words",
       word_save_failed: "Could not save this word. Please try again.",
-      daily_goal_progress: "Daily word goal",
+      daily_goal_progress: "Daily learning goal",
+      daily_learning_goal: "YOUR DAILY GOAL",
+      daily_learning_headline: "Build your English habit, 15 minutes at a time",
+      daily_learning_subtitle: "A little practice every day adds up.",
+      continue_learning: "Continue learning",
+      minutes_short: "min",
+      daily_goal_quiz_time_note: "Based on recorded quiz time today",
       words_added_today: "Words saved today",
       word_saved: "Word \"{{word}}\" saved."
     }
@@ -555,7 +561,13 @@ const resources = {
       delete: "حذف",
       save_to_my_words: "ذخیره در واژگان من",
       word_save_failed: "ذخیره واژه انجام نشد. لطفاً دوباره تلاش کنید.",
-      daily_goal_progress: "هدف روزانه واژگان",
+      daily_goal_progress: "هدف روزانه یادگیری",
+      daily_learning_goal: "هدف روزانه شما",
+      daily_learning_headline: "هر روز ۱۵ دقیقه انگلیسی تمرین کنید",
+      daily_learning_subtitle: "تمرین کوتاه روزانه، در طول زمان نتیجه می‌دهد.",
+      continue_learning: "ادامهٔ یادگیری",
+      minutes_short: "دقیقه",
+      daily_goal_quiz_time_note: "بر اساس زمان ثبت‌شدهٔ آزمون‌های امروز",
       words_added_today: "واژه‌های ذخیره‌شده امروز",
       word_saved: "واژه «{{word}}» ذخیره شد."
     }
