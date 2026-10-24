@@ -51,6 +51,7 @@ def _analyze_or_save_draft(text):
                 "AI correction is unavailable because the Groq provider request failed. Check server logs."
             ),
             "score": None,
+            "mistakes": [],
             "ai_status": "unavailable",
             "ai_error_code": error_code,
         }
@@ -76,6 +77,7 @@ def writing_submit(request):
                 corrected_text=analysis["corrected_text"],
                 feedback=analysis["feedback"],
                 score=analysis["score"],
+                mistakes=analysis.get("mistakes", []),
             )
             if analysis["corrected_text"]:
                 messages.success(request, f"Writing corrected and saved (submission #{submission.pk}).")
@@ -124,6 +126,7 @@ def manage_writings(request):
         corrected_text=analysis["corrected_text"],
         feedback=analysis["feedback"],
         score=analysis["score"],
+        mistakes=analysis.get("mistakes", []),
     )
     response_data = dict(WritingSubmissionSerializer(submission).data)
     response_data["ai_status"] = analysis["ai_status"]
