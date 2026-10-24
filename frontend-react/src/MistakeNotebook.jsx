@@ -126,7 +126,13 @@ export default function MistakeNotebook({ darkMode }) {
   }, [isPersian])
 
   useEffect(() => {
-    loadWritings()
+    let cancelled = false
+    // Defer the initial fetch so state updates happen outside the effect's
+    // synchronous execution path; this also makes the first render predictable.
+    Promise.resolve().then(() => {
+      if (!cancelled) loadWritings()
+    })
+    return () => { cancelled = true }
   }, [loadWritings])
 
   useEffect(() => {
