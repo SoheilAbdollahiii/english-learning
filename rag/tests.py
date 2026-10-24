@@ -119,3 +119,29 @@ class ConversationServiceTests(SimpleTestCase):
         groq_cls.return_value.chat.completions.create.return_value.choices = [MagicMock(message=message)]
         with self.assertRaises(ConversationUnavailable):
             continue_conversation("B1", "daily", [{"role": "user", "content": "Hi there."}])
+
+
+from django.contrib.auth import get_user_model
+from django.urls import reverse
+from rest_framework.test import APITestCase
+
+
+class ConversationEndpointTests(APITestCase):
+    def test_endpoint_requires_authentication(self):
+        response = self.client.post(
+            reverse("conversation_turn"),
+            {"level": "A1", "scenario": "daily", "messages": [{"role": "user", "content": "Hello"}]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_endpoint_rejects_invalid_cefr_level(self):
+        user = get_user_model().objects.create_user(username="conversation-learner", password="Strong-test-pass-123")
+        self.client.force_authenticate(user=user)
+        response = self.client.post(
+            reverse("conversation_turn"),
+            {"level": "C2", "scenario": "daily", "messages": [{"role": "user", "content": "Hello"}]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("detail", response.data)
