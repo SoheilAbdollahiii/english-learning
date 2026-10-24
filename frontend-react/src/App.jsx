@@ -45,6 +45,10 @@ export default function App() {
   const [readingLevel, setReadingLevel] = useState('all')
   const [vocabQuery, setVocabQuery] = useState('')
   const [vocabLevel, setVocabLevel] = useState('all')
+  const [selectedVocabularyWord, setSelectedVocabularyWord] = useState(null)
+  const [vocabularyDictionary, setVocabularyDictionary] = useState(null)
+  const [vocabularyDictionaryLoading, setVocabularyDictionaryLoading] = useState(false)
+  const [vocabularyDictionaryError, setVocabularyDictionaryError] = useState('')
   const [loading, setLoading] = useState(() => !!localStorage.getItem('access_token'))
   
   const [writingText, setWritingText] = useState('')
@@ -884,6 +888,43 @@ export default function App() {
     return matchesQuery && (vocabLevel === 'all' || word.level === vocabLevel)
   })
 
+  useEffect(() => {
+    if (!selectedVocabularyWord?.english_word) {
+      setVocabularyDictionary(null)
+      setVocabularyDictionaryError('')
+      setVocabularyDictionaryLoading(false)
+      return undefined
+    }
+    let cancelled = false
+    const loadDictionaryEntry = async () => {
+      setVocabularyDictionary(null)
+      setVocabularyDictionaryError('')
+      setVocabularyDictionaryLoading(true)
+      try {
+        const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(selectedVocabularyWord.english_word.trim())}`)
+        if (!response.ok) throw new Error('Dictionary entry unavailable')
+        const payload = await response.json()
+        if (!cancelled) setVocabularyDictionary(Array.isArray(payload) ? payload[0] : null)
+      } catch {
+        if (!cancelled) setVocabularyDictionaryError(i18n.language === 'fa'
+          ? 'جزئیات فرهنگ لغت آنلاین در دسترس نیست؛ معنی و مثال ذخیره‌شده همچنان نمایش داده می‌شود.'
+          : 'Online dictionary details are unavailable. The saved meaning and example are still shown.')
+      } finally {
+        if (!cancelled) setVocabularyDictionaryLoading(false)
+      }
+    }
+    loadDictionaryEntry()
+    return () => { cancelled = true }
+  }, [selectedVocabularyWord?.english_word, i18n.language])
+
+  const speakVocabularyWord = (word) => {
+    if (!word?.english_word || typeof window === 'undefined' || !('speechSynthesis' in window)) return
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(word.english_word)
+    utterance.lang = 'en-US'
+    window.speechSynthesis.speak(utterance)
+  }
+
   const handleWritingSubmit = async (e) => {
     e.preventDefault();
     if (!writingText.trim()) return;
@@ -1404,6 +1445,57 @@ export default function App() {
                     <option value="all">{t('all_levels')}</option><option value="A1">A1</option><option value="B1">B1</option><option value="C1">C1</option>
                   </select>
                 </div>
+                {selectedVocabularyWord && (
+                  <section className={`rounded-3xl border p-5 md:p-7 space-y-6 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-indigo-100 shadow-sm'}`} aria-labelledby="vocabulary-detail-title">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wider text-indigo-500">{i18n.language === 'fa' ? 'راهنمای کامل واژه' : 'WORD LEARNING GUIDE'}</p>
+                        <h2 id="vocabulary-detail-title" className="mt-1 text-3xl font-black" dir="ltr">{selectedVocabularyWord.english_word}</h2>
+                        <p className="mt-2 text-indigo-500 font-bold">{selectedVocabularyWord.translation || (i18n.language === 'fa' ? 'معنی ثبت نشده' : 'No saved translation')}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-indigo-500/10 px-3 py-1 text-sm font-bold text-indigo-500">{selectedVocabularyWord.level || 'B1'} · {i18n.language === 'fa' ? 'سطح تقریبی CEFR' : 'estimated CEFR'}</span>
+                        <button type="button" onClick={() => speakVocabularyWord(selectedVocabularyWord)} className="rounded-xl border px-3 py-2 font-bold hover:border-indigo-500" aria-label={i18n.language === 'fa' ? 'شنیدن تلفظ واژه' : 'Listen to pronunciation'}>🔊 {i18n.language === 'fa' ? 'تلفظ' : 'Listen'}</button>
+                        <button type="button" onClick={() => setSelectedVocabularyWord(null)} className="rounded-xl border px-3 py-2 font-bold" aria-label={i18n.language === 'fa' ? 'بستن راهنمای واژه' : 'Close word guide'}>✕</button>
+                      </div>
+                    </div>
+                    <p className={`rounded-xl p-3 text-sm ${darkMode ? 'bg-gray-900/50 text-gray-300' : 'bg-indigo-50 text-gray-700'}`}>{i18n.language === 'fa' ? 'راهنمای تلفظ: روی دکمهٔ «تلفظ» بزنید. تلفظ صوتی از صدای انگلیسی مرورگر استفاده می‌کند و ممکن است به پشتیبانی مرورگر وابسته باشد.' : 'Pronunciation: select Listen to hear the word using your browser’s English voice. Available voices depend on your device and browser.'}</p>
+                    {vocabularyDictionaryLoading && <p role="status" className="text-sm text-gray-500">{i18n.language === 'fa' ? 'در حال دریافت معنی‌ها و مثال‌ها…' : 'Loading meanings and examples…'}</p>}
+                    {vocabularyDictionaryError && <p role="status" className="text-sm text-amber-600">{vocabularyDictionaryError}</p>}
+                    {vocabularyDictionary?.phonetics?.some((item) => item.text) && (
+                      <p className="text-sm" dir="ltr"><strong>{i18n.language === 'fa' ? 'آوانویسی:' : 'Phonetic:'}</strong> {vocabularyDictionary.phonetics.filter((item) => item.text).map((item) => item.text).join(' · ')}</p>
+                    )}
+                    <div className="space-y-3">
+                      <h3 className="text-lg font-extrabold">{i18n.language === 'fa' ? 'معنی‌ها در بافت‌های مختلف' : 'Meanings in different contexts'}</h3>
+                      {vocabularyDictionary?.meanings?.length ? vocabularyDictionary.meanings.map((meaning, index) => (
+                        <div key={`${meaning.partOfSpeech}-${index}`} className={`rounded-2xl border p-4 ${darkMode ? 'border-gray-700 bg-gray-900/30' : 'border-gray-100 bg-gray-50'}`}>
+                          <p className="font-bold text-indigo-500">{meaning.partOfSpeech}</p>
+                          <ul className="mt-2 list-disc space-y-2 pl-5" dir="ltr">
+                            {(meaning.definitions || []).map((definition, definitionIndex) => (
+                              <li key={definitionIndex}>
+                                <p>{definition.definition}</p>
+                                {definition.example && <p className="mt-1 text-sm text-gray-500">{definition.example}</p>}
+                                {definition.example && <p className="text-sm text-indigo-500">{i18n.language === 'fa' ? 'ترجمهٔ فارسی مثال با ترجمه‌گر در دسترس مرورگر قابل دریافت است.' : 'Example translation can be requested with the browser translation service.'}</p>}
+                              </li>
+                            ))}
+                          </ul>
+                          {meaning.synonyms?.length > 0 && <p className="mt-3 text-sm"><strong>{i18n.language === 'fa' ? 'مترادف‌ها:' : 'Synonyms:'}</strong> {meaning.synonyms.join(', ')}</p>}
+                          {meaning.antonyms?.length > 0 && <p className="mt-1 text-sm"><strong>{i18n.language === 'fa' ? 'متضادها:' : 'Antonyms:'}</strong> {meaning.antonyms.join(', ')}</p>}
+                        </div>
+                      )) : (
+                        <p className="text-sm text-gray-500">{i18n.language === 'fa' ? 'معنی ذخیره‌شده در بالا آمده است. برای معنی‌های تکمیلی، اتصال به فرهنگ لغت آنلاین لازم است.' : 'The saved meaning is shown above. Additional definitions require the online dictionary.'}</p>
+                      )}
+                    </div>
+                    <div className={`rounded-2xl border p-4 ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+                      <h3 className="font-extrabold">{i18n.language === 'fa' ? 'مثال و ترکیب‌های رایج' : 'Example and common collocations'}</h3>
+                      {selectedVocabularyWord.example && <p className="mt-2" dir="ltr">{selectedVocabularyWord.example}</p>}
+                      {vocabularyDictionary?.meanings?.flatMap((meaning) => meaning.definitions || []).find((definition) => definition.example)?.example && (
+                        <p className="mt-2" dir="ltr">{vocabularyDictionary.meanings.flatMap((meaning) => meaning.definitions || []).find((definition) => definition.example).example}</p>
+                      )}
+                      <p className="mt-2 text-sm text-gray-500">{i18n.language === 'fa' ? 'ترکیب‌های رایج از داده‌های فرهنگ لغت، در صورت ارائه، در بخش مترادف‌ها و تعریف‌ها نمایش داده می‌شوند.' : 'Dictionary-provided synonyms and definitions above can help you learn common usage; collocations are not always supplied by the source.'}</p>
+                    </div>
+                  </section>
+                )}
                 {vocabularyItems.length === 0 ? <EmptyState message={t('no_words')} darkMode={darkMode} /> : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {vocabularyItems.map((word) => (
@@ -1411,7 +1503,7 @@ export default function App() {
                       <div className={`absolute top-0 right-0 w-16 h-16 rounded-bl-full -z-10 ${darkMode ? 'bg-indigo-950/50' : 'bg-indigo-50'}`}></div>
                       
                       <div className="flex justify-between items-start mb-1">
-                        <h2 className={`text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-gray-800'}`}>{word.english_word}</h2>
+                        <button type="button" onClick={() => { setSelectedVocabularyWord(word); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className={`text-left text-2xl font-black tracking-tight underline-offset-4 hover:text-indigo-500 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 ${darkMode ? 'text-white' : 'text-gray-800'}`} aria-label={`${i18n.language === 'fa' ? 'نمایش راهنمای واژه' : 'Open word guide'}: ${word.english_word}`}>{word.english_word}</button>
                         <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-500'}`}>
                           {word.level || 'B1'}
                         </span>
