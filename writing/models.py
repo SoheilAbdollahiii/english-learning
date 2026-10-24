@@ -10,7 +10,7 @@ class WritingSubmission(models.Model):
     score = models.IntegerField(blank=True, null=True, default=None)
     # Structured, actionable mistakes returned by the correction service.
     # Existing submissions naturally default to an empty list.
-    mistakes = models.JSONField(default=list, blank=True)
+    mistakes = models.JSONField(null=True, blank=True, default=None)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
