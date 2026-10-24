@@ -12,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config("SECRET_KEY")
 DEBUG = config("DEBUG", default=False, cast=bool)
 GROQ_API_KEY = config("GROQ_API_KEY", default="")
-GROQ_MODEL = config("GROQ_MODEL", default="llama-3.3-70b-versatile")
+GROQ_MODEL = config("GROQ_MODEL", default="openai/gpt-oss-120b")
 FRONTEND_URL = config("FRONTEND_URL", default="http://127.0.0.1:5173").rstrip("/")
 ALLOWED_HOSTS = [
     host.strip()
