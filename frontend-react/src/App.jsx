@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts'
 
 import { apiFetch, apiUrl } from './api'
+import ConversationLab from './ConversationLab'
 
 const THEMATIC_VOCABULARY_SETS = [
   {
@@ -791,7 +792,7 @@ export default function App() {
   const { t, i18n } = useTranslation()
   const [activeTab, setActiveTab] = useState(() => {
     const requestedTab = new URLSearchParams(window.location.search).get('tab')
-    return ['dashboard', 'reading', 'vocabulary', 'writing', 'quiz'].includes(requestedTab) ? requestedTab : 'dashboard'
+    return ['dashboard', 'reading', 'vocabulary', 'writing', 'conversation', 'quiz'].includes(requestedTab) ? requestedTab : 'dashboard'
   })
   const [words, setWords] = useState([])
   const [articles, setArticles] = useState([])
@@ -1902,6 +1903,9 @@ export default function App() {
                 <button onClick={() => changeTab('writing')} className={`px-1 pt-1 border-b-2 text-sm font-bold transition-colors ${activeTab === 'writing' ? 'border-indigo-600 text-indigo-500' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
                   {t('tab_writing')}
                 </button>
+                <button onClick={() => changeTab('conversation')} className={`px-1 pt-1 border-b-2 text-sm font-bold transition-colors ${activeTab === 'conversation' ? 'border-indigo-600 text-indigo-500' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                  {t('tab_conversation')}
+                </button>
                 <button onClick={() => changeTab('quiz')} className={`px-1 pt-1 border-b-2 text-sm font-bold transition-colors ${activeTab === 'quiz' ? 'border-indigo-600 text-indigo-500' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
                   {t('tab_quiz')}
                 </button>
@@ -1925,7 +1929,7 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="mb-10 text-center">
           <h1 className={`text-4xl font-black mb-3 tracking-tight ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-            {activeTab === 'reading' ? t('reading_title') : activeTab === 'vocabulary' ? t('vocab_title') : activeTab === 'writing' ? t('writing_title') : activeTab === 'quiz' ? t('quiz_title') : t('dashboard_title')}
+            {activeTab === 'reading' ? t('reading_title') : activeTab === 'vocabulary' ? t('vocab_title') : activeTab === 'writing' ? t('writing_title') : activeTab === 'conversation' ? t('conversation_title') : activeTab === 'quiz' ? t('quiz_title') : t('dashboard_title')}
           </h1>
         </div>
 
@@ -2581,6 +2585,8 @@ export default function App() {
                 </div>
               </div>
             )}
+
+            {activeTab === 'conversation' && <ConversationLab darkMode={darkMode} />}
 
             {activeTab === 'quiz' && (
               <div className="max-w-2xl mx-auto space-y-6">
