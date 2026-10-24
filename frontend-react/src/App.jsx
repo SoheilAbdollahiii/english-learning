@@ -1647,7 +1647,6 @@ export default function App() {
     }
   };
 
-  const dailyWordsAdded = personalWords.filter((word) => new Date(word.created_at).toDateString() === new Date().toDateString()).length
   const dailyLearningSeconds = quizHistory.reduce((total, session) => {
     const createdAt = session.created_at ? new Date(session.created_at) : null
     if (!createdAt || Number.isNaN(createdAt.getTime()) || createdAt.toDateString() !== new Date().toDateString()) return total
