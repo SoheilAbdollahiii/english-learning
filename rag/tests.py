@@ -36,6 +36,45 @@ class CorrectWritingTests(SimpleTestCase):
         self.assertIn("Use past simple for completed past actions.", request["messages"][1]["content"])
         self.assertEqual(request["model"], "test-model")
 
+    @patch("rag.services.retrieve_grammar_rule", return_value="Subject-verb agreement rule")
+    @patch("rag.services.Groq")
+    @override_settings(GROQ_API_KEY="test-key", GROQ_MODEL="test-model")
+    def test_returns_sanitized_structured_mistakes(self, groq_cls, _retrieve):
+        message = MagicMock()
+        message.content = json.dumps({
+            "corrected_text": "She goes to school.",
+            "feedback": "Use the third-person singular form.",
+            "score": 88,
+            "mistakes": [
+                {
+                    "original": "She go",
+                    "correction": "She goes",
+                    "explanation": "Use -s with he/she/it in the present simple.",
+                    "category": "grammar",
+                },
+                {
+                    "original": "",
+                    "correction": "x",
+                    "explanation": "Invalid item should be ignored.",
+                    "category": "grammar",
+                },
+                {
+                    "original": "school",
+                    "correction": "school",
+                    "explanation": "Unsupported category falls back safely.",
+                    "category": "made_up",
+                },
+            ],
+        })
+        groq_cls.return_value.chat.completions.create.return_value.choices = [MagicMock(message=message)]
+
+        result = correct_writing("She go to school.")
+
+        self.assertEqual(len(result["mistakes"]), 2)
+        self.assertEqual(result["mistakes"][0]["original"], "She go")
+        self.assertEqual(result["mistakes"][0]["category"], "grammar")
+        self.assertEqual(result["mistakes"][1]["category"], "other")
+
     @patch("rag.services.retrieve_grammar_rule", return_value="Past simple rule")
     @patch("rag.services.Groq")
     @override_settings(GROQ_API_KEY="test-key", GROQ_MODEL="test-model")
