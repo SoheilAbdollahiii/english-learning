@@ -1852,6 +1852,23 @@ export default function App() {
     }
   };
 
+  const handleDeleteWritingHistory = async () => {
+    if (!writings.length || !window.confirm(t('confirm_delete_writing_history'))) return;
+
+    try {
+      const res = await apiFetch(apiUrl('/writing/api/writings/'), { method: 'DELETE' });
+      if (res.ok) {
+        setWritings([]);
+        alert(t('writing_history_deleted'));
+      } else {
+        alert(t('writing_history_delete_failed'));
+      }
+    } catch (err) {
+      console.error('Error deleting writing history:', err);
+      alert(t('writing_history_delete_failed'));
+    }
+  };
+
   if (!isLoggedIn) {
     return (
       <div className={`min-h-screen flex items-center justify-center py-12 px-4 font-sans ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`} dir={i18n.language === 'fa' ? 'rtl' : 'ltr'}>
@@ -2561,9 +2578,19 @@ export default function App() {
                 </div>
 
                 <div className="space-y-6">
-                  <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                    {t('writing_history')}
-                  </h3>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+                      {t('writing_history')}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={handleDeleteWritingHistory}
+                      disabled={writings.length === 0}
+                      className="rounded-xl border border-rose-300 px-4 py-2 text-sm font-bold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40"
+                    >
+                      {t('delete_writing_history')}
+                    </button>
+                  </div>
                   
                   {writings.length === 0 ? (
                     <EmptyState message={t('no_writings')} darkMode={darkMode} />
