@@ -50,6 +50,7 @@ export default function App() {
   const [vocabularyDictionaryLoading, setVocabularyDictionaryLoading] = useState(false)
   const [vocabularyDictionaryError, setVocabularyDictionaryError] = useState('')
   const [vocabularyExampleTranslations, setVocabularyExampleTranslations] = useState({})
+  const [vocabularyRelatedWords, setVocabularyRelatedWords] = useState({ synonyms: [], antonyms: [], collocations: [] })
   const [loading, setLoading] = useState(() => !!localStorage.getItem('access_token'))
   
   const [writingText, setWritingText] = useState('')
@@ -894,27 +895,98 @@ export default function App() {
       setVocabularyDictionary(null)
       setVocabularyDictionaryError('')
       setVocabularyDictionaryLoading(false)
+      setVocabularyRelatedWords({ synonyms: [], antonyms: [], collocations: [] })
       return undefined
     }
     let cancelled = false
+    const word = selectedVocabularyWord.english_word.trim().toLowerCase()
+    setVocabularyDictionary(null)
+    setVocabularyDictionaryError('')
+    setVocabularyDictionaryLoading(true)
+    setVocabularyRelatedWords({ synonyms: [], antonyms: [], collocations: [] })
+
     const loadDictionaryEntry = async () => {
-      setVocabularyDictionary(null)
-      setVocabularyDictionaryError('')
-      setVocabularyDictionaryLoading(true)
+      let dictionaryEntry = null
       try {
-        const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(selectedVocabularyWord.english_word.trim())}`)
-        if (!response.ok) throw new Error('Dictionary entry unavailable')
-        const payload = await response.json()
-        if (!cancelled) setVocabularyDictionary(Array.isArray(payload) ? payload[0] : null)
+        const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`)
+        if (response.ok) {
+          const payload = await response.json()
+          dictionaryEntry = Array.isArray(payload) && payload.length ? payload[0] : null
+        }
       } catch {
-        if (!cancelled) setVocabularyDictionaryError(i18n.language === 'fa'
-          ? 'جزئیات فرهنگ لغت آنلاین در دسترس نیست؛ معنی و مثال ذخیره‌شده همچنان نمایش داده می‌شود.'
-          : 'Online dictionary details are unavailable. The saved meaning and example are still shown.')
-      } finally {
-        if (!cancelled) setVocabularyDictionaryLoading(false)
+        // Try the independent Datamuse source if the dictionary request fails.
+      }
+
+      const datamuse = async (params) => {
+        const url = new URL('https://api.datamuse.com/words')
+        url.search = new URLSearchParams({ ...params, max: '12' }).toString()
+        const response = await fetch(url.toString())
+        if (!response.ok) return []
+        const payload = await response.json()
+        return Array.isArray(payload) ? payload : []
+      }
+      const [definitions, synonyms, antonyms, followers, predecessors] = await Promise.allSettled([
+        datamuse({ sp: word, md: 'dp' }),
+        datamuse({ rel_syn: word }),
+        datamuse({ rel_ant: word }),
+        datamuse({ rel_bga: word }),
+        datamuse({ rel_bgb: word }),
+      ])
+      const exactDefinition = definitions.status === 'fulfilled'
+        ? definitions.value.find((item) => item.word?.toLowerCase() === word && Array.isArray(item.defs))
+        : null
+      if (!dictionaryEntry && exactDefinition?.defs?.length) {
+        const grouped = new Map()
+        exactDefinition.defs.forEach((item) => {
+          const [partOfSpeech, ...definitionParts] = String(item).split('\t')
+          const definition = definitionParts.join('\t').trim()
+          if (!definition) return
+          const part = partOfSpeech || 'meaning'
+          if (!grouped.has(part)) grouped.set(part, [])
+          grouped.get(part).push({ definition })
+        })
+        if (grouped.size) {
+          dictionaryEntry = {
+            word,
+            meanings: [...grouped.entries()].map(([partOfSpeech, items]) => ({ partOfSpeech, definitions: items })),
+            phonetics: [],
+            source: 'datamuse',
+          }
+        }
+      }
+      const related = {
+        synonyms: synonyms.status === 'fulfilled' ? synonyms.value.map((item) => item.word).filter(Boolean).slice(0, 8) : [],
+        antonyms: antonyms.status === 'fulfilled' ? antonyms.value.map((item) => item.word).filter(Boolean).slice(0, 8) : [],
+        collocations: [...new Set([
+          ...(followers.status === 'fulfilled' ? followers.value.map((item) => item.word) : []),
+          ...(predecessors.status === 'fulfilled' ? predecessors.value.map((item) => item.word) : []),
+        ].filter(Boolean))].slice(0, 10),
+      }
+      if (dictionaryEntry?.meanings?.length) {
+        dictionaryEntry.meanings = dictionaryEntry.meanings.map((meaning) => ({
+          ...meaning,
+          synonyms: [...new Set([...(meaning.synonyms || []), ...related.synonyms])],
+          antonyms: [...new Set([...(meaning.antonyms || []), ...related.antonyms])],
+        }))
+      }
+      if (!cancelled) {
+        setVocabularyDictionary(dictionaryEntry)
+        setVocabularyRelatedWords(related)
+        if (!dictionaryEntry?.meanings?.length) {
+          setVocabularyDictionaryError(i18n.language === 'fa'
+            ? 'تعریف آنلاین برای این واژه پیدا نشد؛ معنی و مثال ذخیره‌شده همچنان در دسترس است.'
+            : 'No online definition was found. The saved meaning and example are still available.')
+        }
       }
     }
+
     loadDictionaryEntry()
+      .catch(() => {
+        if (!cancelled) setVocabularyDictionaryError(i18n.language === 'fa'
+          ? 'منابع فرهنگ لغت موقتاً پاسخ نمی‌دهند؛ معنی و مثال ذخیره‌شده همچنان در دسترس است.'
+          : 'Dictionary sources are temporarily unavailable. The saved meaning and example are still available.')
+      })
+      .finally(() => { if (!cancelled) setVocabularyDictionaryLoading(false) })
     return () => { cancelled = true }
   }, [selectedVocabularyWord?.english_word, i18n.language])
 
@@ -1501,7 +1573,11 @@ export default function App() {
                           {meaning.antonyms?.length > 0 && <p className="mt-1 text-sm"><strong>{i18n.language === 'fa' ? 'متضادها:' : 'Antonyms:'}</strong> {meaning.antonyms.join(', ')}</p>}
                         </div>
                       )) : (
-                        <p className="text-sm text-gray-500">{i18n.language === 'fa' ? 'معنی ذخیره‌شده در بالا آمده است. برای معنی‌های تکمیلی، اتصال به فرهنگ لغت آنلاین لازم است.' : 'The saved meaning is shown above. Additional definitions require the online dictionary.'}</p>
+                        <div className="space-y-2 text-sm text-gray-500">
+                          <p>{selectedVocabularyWord.translation || (i18n.language === 'fa' ? 'برای این واژه معنی ذخیره‌شده‌ای وجود ندارد.' : 'No saved translation is available for this word.')}</p>
+                          {selectedVocabularyWord.example && <p dir="ltr">{selectedVocabularyWord.example}</p>}
+                          <p>{i18n.language === 'fa' ? 'برای جلوگیری از نمایش معنی ساختگی، فقط معنی ذخیره‌شده نشان داده می‌شود؛ با پاسخ‌گویی منبع آنلاین، تعریف‌های تکمیلی بارگذاری می‌شوند.' : 'To avoid inventing definitions, only saved vocabulary data is shown until an online dictionary source responds.'}</p>
+                        </div>
                       )}
                     </div>
                     <div className={`rounded-2xl border p-4 ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
@@ -1511,17 +1587,20 @@ export default function App() {
                         <p className="mt-2" dir="ltr">{vocabularyDictionary.meanings.flatMap((meaning) => meaning.definitions || []).find((definition) => definition.example).example}</p>
                       )}
                       <h4 className="mt-4 font-bold">{i18n.language === 'fa' ? 'مترادف‌ها و متضادها' : 'Synonyms and antonyms'}</h4>
-                      {(vocabularyDictionary?.meanings || []).some((meaning) => meaning.synonyms?.length || meaning.antonyms?.length) ? (
-                        <div className="mt-2 space-y-2">
-                          {(vocabularyDictionary?.meanings || []).map((meaning, index) => (
-                            <div key={`relations-${index}`} className="text-sm">
-                              {meaning.synonyms?.length > 0 && <p><strong>{i18n.language === 'fa' ? 'مترادف‌ها:' : 'Synonyms:'}</strong> {meaning.synonyms.join(', ')}</p>}
-                              {meaning.antonyms?.length > 0 && <p><strong>{i18n.language === 'fa' ? 'متضادها:' : 'Antonyms:'}</strong> {meaning.antonyms.join(', ')}</p>}
-                            </div>
-                          ))}
+                      {((vocabularyRelatedWords.synonyms || []).length || (vocabularyRelatedWords.antonyms || []).length || (vocabularyDictionary?.meanings || []).some((meaning) => meaning.synonyms?.length || meaning.antonyms?.length)) ? (
+                        <div className="mt-2 space-y-2 text-sm">
+                          {(() => {
+                            const synonyms = [...new Set([...(vocabularyRelatedWords.synonyms || []), ...(vocabularyDictionary?.meanings || []).flatMap((meaning) => meaning.synonyms || [])])].filter((item) => item.toLowerCase() !== selectedVocabularyWord.english_word.toLowerCase()).slice(0, 12)
+                            const antonyms = [...new Set([...(vocabularyRelatedWords.antonyms || []), ...(vocabularyDictionary?.meanings || []).flatMap((meaning) => meaning.antonyms || [])])].filter((item) => item.toLowerCase() !== selectedVocabularyWord.english_word.toLowerCase()).slice(0, 12)
+                            return <>{synonyms.length > 0 && <p><strong>{i18n.language === 'fa' ? 'مترادف‌ها:' : 'Synonyms:'}</strong> {synonyms.join(', ')}</p>}{antonyms.length > 0 && <p><strong>{i18n.language === 'fa' ? 'متضادها:' : 'Antonyms:'}</strong> {antonyms.join(', ')}</p>}</>
+                          })()}
                         </div>
-                      ) : <p className="mt-1 text-sm text-gray-500">{i18n.language === 'fa' ? 'برای این واژه، فرهنگ لغت منبع مترادف یا متضاد ثبت نکرده است.' : 'The dictionary source did not provide synonyms or antonyms for this entry.'}</p>}
-                      <p className="mt-2 text-sm text-gray-500">{i18n.language === 'fa' ? 'ترکیب‌های رایج ممکن است در ورودی فرهنگ لغت موجود نباشند؛ مثال‌ها کاربرد واژه را در جمله نشان می‌دهند.' : 'The dictionary source does not consistently provide collocations; example sentences illustrate real usage.'}</p>
+                      ) : <p className="mt-1 text-sm text-gray-500">{i18n.language === 'fa' ? 'منابع آنلاین برای این واژه مترادف یا متضاد قابل اتکایی برنگرداندند.' : 'The available sources did not return reliable synonyms or antonyms for this word.'}</p>}
+                      <h4 className="mt-4 font-bold">{i18n.language === 'fa' ? 'عبارت‌های مرتبط پرتکرار' : 'Frequently associated phrases'}</h4>
+                      {vocabularyRelatedWords.collocations?.length ? (
+                        <p className="mt-1 text-sm" dir="ltr">{vocabularyRelatedWords.collocations.join(' · ')}</p>
+                      ) : <p className="mt-1 text-sm text-gray-500">{i18n.language === 'fa' ? 'برای این واژه عبارت پرتکرار قابل اتکایی پیدا نشد؛ مثال‌های بالا کاربرد واژه را در جمله نشان می‌دهند.' : 'No reliable associated phrases were found; the examples above show the word in context.'}</p>}
+                      <p className="mt-2 text-xs text-gray-500">{i18n.language === 'fa' ? 'تعریف‌ها و روابط واژه از فرهنگ لغت آزاد و Datamuse دریافت می‌شوند؛ عبارت‌های مرتبط آماری‌اند و لزوماً ترکیب دستوری ثابت نیستند.' : 'Definitions and word relations come from the Free Dictionary and Datamuse. Associated phrases are statistical suggestions, not guaranteed fixed collocations.'}</p>
                     </div>
                   </section>
                 )}
