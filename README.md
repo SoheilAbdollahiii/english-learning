@@ -5,6 +5,7 @@ An English-learning application with a Django REST API, a React learning interfa
 ## Stage 2 features
 
 - **LLM writing correction:** Uses the Groq API to return corrected text, concise feedback, and a 0–100 writing score. The score is model-generated guidance, not an official proficiency or exam score.
+- **Personal mistake notebook:** Revisit successful writing corrections, search original text and feedback, save submissions for practice, and hide/reveal corrected answers. Saved selections are local to the current browser; writing and feedback remain scoped to the authenticated account.
 - **Document-grounded RAG:** Retrieves a relevant rule from the local grammar reference at `rag/knowledge/grammar_rules.md` and supplies it to the model as context. Retrieval runs locally and does not download embedding models at runtime. If no relevant rule is found, the model is told that no matching reference was retrieved.
 - **Honest fallback:** If the API key is missing or the provider fails, the original writing is saved, but the app does not invent a correction or score.
 - **Bilingual interface:** The React interface supports English and Persian, including right-to-left layout for Persian. Language choice is saved in the browser.
@@ -73,7 +74,7 @@ Run `python manage.py migrate` after pulling the changes so the personal data ta
    python manage.py runserver
    ```
 
-Without `GROQ_API_KEY`, the site still saves drafts but clearly reports that automated correction is unavailable.
+Without a real `GROQ_API_KEY`, the site still saves drafts but reports that automated correction is unavailable. Do not leave the `.env.example` placeholder (`your-groq-api-key`) in your local `.env`. The writing API returns an `ai_error_code` (`missing_api_key`, `invalid_api_key`, `rate_limited`, `invalid_model_or_request`, `network_error`, or `provider_error`) so the React UI can give a targeted next step. Provider failures are logged by the Django `rag.services` logger; check server logs for the underlying error without exposing credentials.
 
 ## Run the React frontend
 

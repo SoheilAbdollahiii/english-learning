@@ -8,6 +8,8 @@ from rest_framework.decorators import api_view, permission_classes, throttle_cla
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from django.conf import settings
+
 from rag.services import CorrectionUnavailable, correct_writing
 from .models import WritingSubmission
 from .serializers import WritingSubmissionSerializer
@@ -34,15 +36,23 @@ def _consume_html_correction_quota(user_id):
 def _analyze_or_save_draft(text):
     """Use the LLM when configured; never fabricate correction or feedback."""
     try:
-        return correct_writing(text)
-    except CorrectionUnavailable:
+        analysis = correct_writing(text)
+        return {**analysis, "ai_status": "corrected", "ai_error_code": None}
+    except CorrectionUnavailable as exc:
+        configured_key = (settings.GROQ_API_KEY or "").strip()
+        placeholder_keys = {"your-groq-api-key", "your_groq_api_key", "replace-with-your-groq-api-key"}
+        missing_key = not configured_key or configured_key.lower() in placeholder_keys
+        error_code = "missing_api_key" if missing_key else getattr(exc, "code", "provider_error")
         return {
             "corrected_text": "",
             "feedback": (
-                "AI correction is unavailable. The original draft was saved without "
-                "automated correction; please try again later."
+                "AI correction is unavailable because GROQ_API_KEY is not configured with a real key."
+                if missing_key else
+                "AI correction is unavailable because the Groq provider request failed. Check server logs."
             ),
             "score": None,
+            "ai_status": "unavailable",
+            "ai_error_code": error_code,
         }
 
 
@@ -115,4 +125,7 @@ def manage_writings(request):
         feedback=analysis["feedback"],
         score=analysis["score"],
     )
-    return Response(WritingSubmissionSerializer(submission).data, status=201)
+    response_data = dict(WritingSubmissionSerializer(submission).data)
+    response_data["ai_status"] = analysis["ai_status"]
+    response_data["ai_error_code"] = analysis["ai_error_code"]
+    return Response(response_data, status=201)

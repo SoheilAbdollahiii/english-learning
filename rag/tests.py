@@ -69,6 +69,17 @@ class CorrectWritingTests(SimpleTestCase):
                 correct_writing("I went home yesterday.")
         self.assertIn("Groq writing correction failed (model=test-model)", logs.output[0])
 
+    @patch("rag.services.retrieve_grammar_rule", return_value="Past simple rule")
+    @patch("rag.services.Groq")
+    @override_settings(GROQ_API_KEY="test-key", GROQ_MODEL="test-model")
+    def test_classifies_invalid_api_key_response(self, groq_cls, _retrieve):
+        error = RuntimeError("unauthorized")
+        error.status_code = 401
+        groq_cls.return_value.chat.completions.create.side_effect = error
+        with self.assertRaises(CorrectionUnavailable) as raised:
+            correct_writing("I go home yesterday.")
+        self.assertEqual(raised.exception.code, "invalid_api_key")
+
 
 
 class ConversationServiceTests(SimpleTestCase):

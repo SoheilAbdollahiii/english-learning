@@ -13,13 +13,18 @@ logger = logging.getLogger(__name__)
 class CorrectionUnavailable(RuntimeError):
     """Raised when the language model cannot provide a reliable correction."""
 
+    def __init__(self, message: str, code: str = "provider_error"):
+        super().__init__(message)
+        self.code = code
+
 
 def correct_writing(text: str) -> dict:
     """Return corrected writing, actionable feedback, a score, and RAG context."""
     api_key = settings.GROQ_API_KEY
-    if not api_key:
-        logger.error("AI writing correction unavailable: GROQ_API_KEY is not configured.")
-        raise CorrectionUnavailable("GROQ_API_KEY is not configured.")
+    placeholder_keys = {"your-groq-api-key", "your_groq_api_key", "replace-with-your-groq-api-key"}
+    if not api_key or api_key.strip().lower() in placeholder_keys:
+        logger.error("AI writing correction unavailable: GROQ_API_KEY is missing or still contains a placeholder.")
+        raise CorrectionUnavailable("GROQ_API_KEY is not configured with a real API key.", code="missing_api_key")
 
     try:
         rule = retrieve_grammar_rule(text)
@@ -70,6 +75,19 @@ def correct_writing(text: str) -> dict:
         }
     except Exception as exc:
         logger.exception("Groq writing correction failed (model=%s).", settings.GROQ_MODEL)
+        status_code = getattr(exc, "status_code", None)
+        exception_name = type(exc).__name__
+        if status_code in (401, 403) or "Authentication" in exception_name:
+            error_code = "invalid_api_key"
+        elif status_code == 429 or "RateLimit" in exception_name:
+            error_code = "rate_limited"
+        elif status_code == 400 or "BadRequest" in exception_name:
+            error_code = "invalid_model_or_request"
+        elif any(token in exception_name for token in ("Connection", "Timeout", "Network")):
+            error_code = "network_error"
+        else:
+            error_code = "provider_error"
         raise CorrectionUnavailable(
-            "The AI correction service is temporarily unavailable. Please try again."
+            "The AI correction service is temporarily unavailable. Please try again.",
+            code=error_code,
         ) from exc
