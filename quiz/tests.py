@@ -124,6 +124,35 @@ class LearningQuizTests(TestCase):
         ):
             self.assertTrue(detail[field], f"Missing educational feedback field: {field}")
 
+    def test_wrong_quiz_answers_are_saved_to_private_mistake_notebook(self):
+        question = Question.objects.filter(quiz_type="vocabulary", level="A1").first()
+        wrong_answer = next(option for option in ("A", "B", "C", "D") if option != question.correct_option)
+        response = self.client.post(
+            reverse("quiz_submit"),
+            {
+                "quiz_type": "vocabulary",
+                "level": "A1",
+                "answers": {str(question.id): wrong_answer},
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        saved = QuizSession.objects.get(user=self.learner)
+        self.assertIsInstance(saved.mistake_patterns, dict)
+        self.assertEqual(len(saved.mistake_patterns["questions"]), 1)
+        mistake = saved.mistake_patterns["questions"][0]
+        self.assertEqual(mistake["question_id"], question.id)
+        self.assertEqual(mistake["user_answer_text"], getattr(question, f"option_{wrong_answer.lower()}"))
+
+        notebook = self.client.get(reverse("quiz_mistakes"))
+        self.assertEqual(notebook.status_code, 200)
+        self.assertEqual(len(notebook.data), 1)
+        self.assertEqual(notebook.data[0]["question_id"], question.id)
+        self.assertEqual(notebook.data[0]["user_answer_text"], getattr(question, f"option_{wrong_answer.lower()}"))
+
+        self.client.force_authenticate(user=self.other)
+        self.assertEqual(self.client.get(reverse("quiz_mistakes")).data, [])
+
     def test_mixed_quiz_submission_accepts_questions_from_multiple_types_and_levels(self):
         vocabulary = Question.objects.filter(quiz_type="vocabulary", level="A1").first()
         grammar = Question.objects.filter(quiz_type="grammar", level="B1").first()
