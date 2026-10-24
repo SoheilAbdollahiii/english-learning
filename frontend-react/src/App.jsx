@@ -840,6 +840,7 @@ export default function App() {
   
   const [writingText, setWritingText] = useState('')
   const [submittingWriting, setSubmittingWriting] = useState(false)
+  const [writingNotice, setWritingNotice] = useState(null)
 
   // کوئیز
   const [quizQuestions, setQuizQuestions] = useState([])
@@ -1818,6 +1819,7 @@ export default function App() {
     e.preventDefault();
     if (!writingText.trim()) return;
 
+    setWritingNotice(null);
     setSubmittingWriting(true);
     try {
       const res = await apiFetch(apiUrl('/writing/api/writings/'), {
@@ -1829,7 +1831,7 @@ export default function App() {
         const newSubmission = await res.json();
         setWritings([newSubmission, ...writings]);
         setWritingText('');
-        if (newSubmission.ai_status === 'corrected' && newSubmission.corrected_text) alert(t('writing_analyzed'));
+        if (newSubmission.ai_status === 'corrected' && newSubmission.corrected_text) setWritingNotice({ type: 'success', key: 'writing_analyzed' });
         else if (newSubmission.ai_status === 'unavailable') {
           const errorMessageKey = ({
             missing_api_key: 'writing_ai_missing_key',
@@ -1839,15 +1841,15 @@ export default function App() {
             invalid_model_or_request: 'writing_ai_model_error',
             network_error: 'writing_ai_network_error',
           })[newSubmission.ai_error_code] || 'writing_ai_provider_error';
-          alert(t(errorMessageKey));
+          setWritingNotice({ type: 'warning', key: errorMessageKey });
         }
-        else alert(t('writing_saved'));
+        else setWritingNotice({ type: 'warning', key: 'writing_saved' });
       } else {
-        alert(t('writing_failed'));
+        setWritingNotice({ type: 'error', key: 'writing_failed' });
       }
     } catch (err) {
       console.error('Error submitting writing:', err);
-      alert(t('writing_failed'));
+      setWritingNotice({ type: 'error', key: 'writing_failed' });
     } finally {
       setSubmittingWriting(false);
     }
@@ -2557,17 +2559,30 @@ export default function App() {
                   </h3>
                   <div className={`rounded-xl p-4 mb-4 border ${darkMode ? 'bg-indigo-950/40 border-indigo-900' : 'bg-indigo-50 border-indigo-100'}`}>
                     <p className="text-sm font-semibold">{t(goalPromptKey)}</p>
+                    <p className={`mt-2 text-xs ${darkMode ? 'text-indigo-200' : 'text-indigo-700'}`}>{t('writing_prompt_hint')}</p>
                   </div>
+                  {writingNotice && (
+                    <div role="status" className={`mb-4 rounded-xl border p-3 text-sm ${writingNotice.type === 'success' ? (darkMode ? 'border-emerald-800 bg-emerald-950/40 text-emerald-200' : 'border-emerald-200 bg-emerald-50 text-emerald-800') : writingNotice.type === 'error' ? (darkMode ? 'border-rose-800 bg-rose-950/40 text-rose-200' : 'border-rose-200 bg-rose-50 text-rose-800') : (darkMode ? 'border-amber-800 bg-amber-950/40 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800')}>
+                      <div className="flex items-start justify-between gap-3">
+                        <span>{t(writingNotice.key)}</span>
+                        <button type="button" onClick={() => setWritingNotice(null)} className="shrink-0 font-bold opacity-70 hover:opacity-100" aria-label={t('dismiss_notice')}>×</button>
+                      </div>
+                    </div>
+                  )}
                   <form onSubmit={handleWritingSubmit} className="space-y-4">
                     <textarea 
                       rows="4" 
                       value={writingText}
-                      onChange={(e) => setWritingText(e.target.value)}
+                      onChange={(e) => { setWritingText(e.target.value); if (writingNotice) setWritingNotice(null); }}
                       placeholder={t('writing_placeholder')}
                       className={`w-full p-4 rounded-2xl border focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-200 text-gray-900 placeholder-gray-400'}`}
                       dir="ltr"
                       required
                     ></textarea>
+                    <div className={`flex flex-wrap items-center justify-between gap-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      <span>{t('writing_word_count', { count: writingText.trim() ? writingText.trim().split(/\s+/).length : 0 })}</span>
+                      <span>{t('writing_character_count', { count: writingText.length })}</span>
+                    </div>
                     <button 
                       type="submit" 
                       disabled={submittingWriting}
@@ -2598,12 +2613,20 @@ export default function App() {
                   ) : (
                     writings.map((item) => (
                       <div key={item.id} className={`p-6 rounded-2xl shadow-sm border space-y-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-gray-400 font-bold">{new Date(item.created_at).toLocaleDateString(i18n.language === 'fa' ? 'fa-IR' : 'en-US')}</span>
-                          {item.score !== null && item.score !== undefined && (
-                            <span className="bg-indigo-50 dark:bg-indigo-950 text-indigo-600 font-black text-sm px-3 py-1 rounded-full">
-                              {t('score_value', { score: item.score })}
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <span className="block text-xs text-gray-400 font-bold">{new Date(item.created_at).toLocaleDateString(i18n.language === 'fa' ? 'fa-IR' : 'en-US')}</span>
+                            <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${item.corrected_text ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'}`}>
+                              <span aria-hidden="true">{item.corrected_text ? '✓' : '!'}</span>{item.corrected_text ? t('writing_status_corrected') : t('writing_status_saved_only')}
                             </span>
+                          </div>
+                          {item.score !== null && item.score !== undefined && (
+                            <div className="min-w-32 text-end">
+                              <span className="text-sm font-black text-indigo-600 dark:text-indigo-300">{t('score_value', { score: item.score })}</span>
+                              <div className={`mt-2 h-2 overflow-hidden rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`} role="progressbar" aria-label={t('writing_score')} aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.max(0, Math.min(100, Number(item.score) || 0))}>
+                                <div className={`h-full rounded-full ${item.score >= 80 ? 'bg-emerald-500' : item.score >= 60 ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${Math.max(0, Math.min(100, Number(item.score) || 0))}%` }} />
+                              </div>
+                            </div>
                           )}
                         </div>
                         
@@ -2617,7 +2640,37 @@ export default function App() {
                             {item.corrected_text ? <p className="font-medium text-justify text-indigo-600 dark:text-indigo-300" dir="ltr">{item.corrected_text}</p> : <p className="text-sm text-amber-600">{t('correction_unavailable')}</p>}
                           </div>
                         </div>
-                        {item.feedback && <div className={`p-4 rounded-xl border text-sm ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-gray-50 border-gray-200'}`}><strong>{t('feedback')}:</strong> {item.feedback}</div>}
+                        {item.feedback && <div className={`rounded-2xl border p-4 text-sm ${darkMode ? 'border-sky-900 bg-sky-950/30 text-sky-100' : 'border-sky-100 bg-sky-50 text-sky-950'}`}><div className="mb-2 flex items-center gap-2 font-bold"><span aria-hidden="true">💡</span>{t('feedback')}</div><p className="leading-7">{item.feedback}</p></div>}
+                        {Array.isArray(item.mistakes) && item.mistakes.length > 0 && (
+                          <section className={`rounded-2xl border p-4 ${darkMode ? 'border-rose-900/70 bg-gray-900/40' : 'border-rose-100 bg-rose-50/50'}`} aria-label={t('writing_issues')}>
+                            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                              <h4 className={`font-bold ${darkMode ? 'text-rose-200' : 'text-rose-800'}`}>{t('writing_issues')}</h4>
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${darkMode ? 'bg-rose-950 text-rose-200' : 'bg-white text-rose-700'}`}>{t('writing_issue_count', { count: item.mistakes.length })}</span>
+                            </div>
+                            <div className="space-y-3">
+                              {item.mistakes.map((mistake, index) => (
+                                <article key={`${item.id}-mistake-${index}`} className={`rounded-xl border p-3 ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-rose-100 bg-white'}`}>
+                                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                                    <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-black ${darkMode ? 'bg-rose-950 text-rose-200' : 'bg-rose-100 text-rose-700'}`}>{index + 1}</span>
+                                    <span className={`rounded-full px-2 py-1 text-xs font-bold ${darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-700'}`}>{t(`writing_category_${mistake.category || 'other'}`, { defaultValue: t('writing_category_other') })}</span>
+                                  </div>
+                                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    <div className={`rounded-lg p-3 ${darkMode ? 'bg-rose-950/30' : 'bg-rose-50'}`}>
+                                      <span className="mb-1 block text-xs font-bold text-rose-500">{t('writing_original_phrase')}</span>
+                                      <p className="font-medium leading-6 text-gray-800 dark:text-gray-100" dir="ltr">{mistake.original}</p>
+                                    </div>
+                                    <div className={`rounded-lg p-3 ${darkMode ? 'bg-emerald-950/30' : 'bg-emerald-50'}`}>
+                                      <span className="mb-1 block text-xs font-bold text-emerald-600">{t('writing_better_phrase')}</span>
+                                      <p className="font-medium leading-6 text-gray-800 dark:text-gray-100" dir="ltr">{mistake.correction}</p>
+                                    </div>
+                                  </div>
+                                  <p className={`mt-3 text-sm leading-7 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{mistake.explanation}</p>
+                                </article>
+                              ))}
+                            </div>
+                          </section>
+                        )}
+                        {item.corrected_text && Array.isArray(item.mistakes) && item.mistakes.length === 0 && <div className={`rounded-xl border p-3 text-sm ${darkMode ? 'border-emerald-900 bg-emerald-950/30 text-emerald-200' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>✓ {t('writing_no_issues')}</div>}
                       </div>
                     ))
                   )}
