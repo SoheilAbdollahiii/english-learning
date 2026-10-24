@@ -159,7 +159,7 @@ export default function MistakeNotebook({ darkMode }) {
     const explanation = [
       chosenAnswer ? (isPersian ? `پاسخ انتخابی: ${chosenAnswer}` : `Your selected answer: ${chosenAnswer}`) : '',
       item.explanation || '', item.common_mistake || '', item.example_sentence || '', item.example_translation || '',
-    ].filter(Boolean).join('\\n\\n')
+    ].filter(Boolean).join('\n\n')
     return {
       key: `quiz:${item.session_id || 'session'}:${item.question_id}`,
       original: item.question_text || '',
