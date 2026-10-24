@@ -1,142 +1,131 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { apiFetch, apiUrl } from './api'
 
-const SCENARIOS = [
-  { id: 'restaurant', icon: '🍽️', title: 'conversation_scenario_restaurant', description: 'conversation_scenario_restaurant_desc', starter: 'Hi, could I see the menu, please?' },
-  { id: 'interview', icon: '💼', title: 'conversation_scenario_interview', description: 'conversation_scenario_interview_desc', starter: 'Thank you for meeting with me. Could you tell me about the role?' },
-  { id: 'travel', icon: '✈️', title: 'conversation_scenario_travel', description: 'conversation_scenario_travel_desc', starter: 'Excuse me, could you help me find the train station?' },
-  { id: 'daily', icon: '☕', title: 'conversation_scenario_daily', description: 'conversation_scenario_daily_desc', starter: 'Hi! How is your day going?' },
-]
-const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1']
-
-export default function ConversationLab({ darkMode }) {
-  const { t } = useTranslation()
-  const [level, setLevel] = useState('A2')
-  const [scenario, setScenario] = useState('daily')
-  const [messages, setMessages] = useState([])
-  const [draft, setDraft] = useState('')
-  const [feedback, setFeedback] = useState(null)
-  const [loading, setLoading] = useState(false)
+/**
+ * A practical replacement for Conversation Lab: one place to revisit reading
+ * articles and saved vocabulary. Reading progress remains backed by the existing
+ * reading API, and vocabulary review is delegated to the app's spaced-repetition
+ * flow so that scheduling and scoring stay consistent.
+ */
+export default function ConversationLab({ darkMode, onStartWordReview }) {
+  const { t, i18n } = useTranslation()
+  const isPersian = (i18n.resolvedLanguage || i18n.language || '').toLowerCase().startsWith('fa')
+  const [articles, setArticles] = useState([])
+  const [progress, setProgress] = useState([])
+  const [words, setWords] = useState([])
+  const [filter, setFilter] = useState('unread')
+  const [expandedArticle, setExpandedArticle] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [savingArticle, setSavingArticle] = useState(null)
   const [error, setError] = useState('')
 
-  const panel = darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'
+  const darkPanel = darkMode ? 'border-gray-700 bg-gray-800 text-gray-100' : 'border-gray-200 bg-white text-gray-900'
   const muted = darkMode ? 'text-gray-300' : 'text-gray-600'
+  const completedIds = useMemo(() => new Set(progress.filter((item) => item.completed).map((item) => item.article_id)), [progress])
+  const unreadArticles = useMemo(() => articles.filter((article) => !completedIds.has(article.id)), [articles, completedIds])
+  const shownArticles = filter === 'unread' ? unreadArticles : filter === 'read' ? articles.filter((article) => completedIds.has(article.id)) : articles
 
-  async function sendTurn(text, history = messages) {
-    const content = text.trim()
-    if (!content || loading) return
-    const nextMessages = [...history, { role: 'user', content }]
-    setMessages(nextMessages)
-    setDraft('')
-    setFeedback(null)
-    setError('')
+  const loadData = useCallback(async () => {
     setLoading(true)
+    setError('')
     try {
-      const response = await apiFetch(apiUrl('/api/conversation/turn/'), {
-        method: 'POST',
-        body: JSON.stringify({ level, scenario, messages: nextMessages.slice(-12) }),
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.detail || t('conversation_error'))
-      setMessages([...nextMessages, { role: 'assistant', content: data.reply }])
-      setFeedback({
-        correctedText: data.corrected_text || '',
-        explanation: data.feedback || '',
-        phrases: Array.isArray(data.useful_phrases) ? data.useful_phrases : [],
-      })
+      const [articlesRes, progressRes, wordsRes] = await Promise.all([
+        apiFetch(apiUrl('/reading/api/articles/')),
+        apiFetch(apiUrl('/reading/api/progress/')),
+        apiFetch(apiUrl('/vocabulary/api/my-words/')),
+      ])
+      const results = await Promise.all([articlesRes.json(), progressRes.json(), wordsRes.json()])
+      if (!articlesRes.ok) throw new Error(results[0]?.detail || (isPersian ? 'بارگذاری متن‌ها ناموفق بود.' : 'Could not load reading articles.'))
+      setArticles(Array.isArray(results[0]) ? results[0] : [])
+      setProgress(progressRes.ok && Array.isArray(results[1]) ? results[1] : [])
+      setWords(wordsRes.ok && Array.isArray(results[2]) ? results[2] : [])
     } catch (err) {
-      setMessages(history)
-      setDraft(content)
-      setError(err.message || t('conversation_error'))
+      setError(err.message || (isPersian ? 'خطا در دریافت اطلاعات.' : 'Could not load your review items.'))
     } finally {
       setLoading(false)
     }
+  }, [isPersian])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  const markArticle = async (article, completed) => {
+    setSavingArticle(article.id)
+    setError('')
+    try {
+      const response = await apiFetch(apiUrl('/reading/api/progress/'), {
+        method: 'POST',
+        body: JSON.stringify({ article_id: article.id, completed }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.detail || (isPersian ? 'ذخیرهٔ وضعیت مطالعه ناموفق بود.' : 'Could not save reading status.'))
+      setProgress((current) => [data, ...current.filter((item) => item.article_id !== article.id)])
+    } catch (err) {
+      setError(err.message || (isPersian ? 'ذخیره انجام نشد.' : 'Changes could not be saved.'))
+    } finally {
+      setSavingArticle(null)
+    }
   }
 
-  function startSession() {
-    setMessages([])
-    setFeedback(null)
-    setError('')
-    const selected = SCENARIOS.find((item) => item.id === scenario)
-    sendTurn(selected.starter, [])
-  }
-
-  function resetSession() {
-    setMessages([])
-    setFeedback(null)
-    setDraft('')
-    setError('')
-  }
+  const titleOf = (article) => article.title || article.name || (isPersian ? 'متن خواندنی' : 'Reading article')
+  const wordOf = (word) => word.english_word || word.word || word.term || ''
+  const translationOf = (word) => word.translation || word.persian_translation || word.meaning || ''
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <section className={`rounded-3xl border p-6 shadow-sm sm:p-8 ${panel}`}>
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-indigo-500">{t('conversation_eyebrow')}</p>
-            <h2 className={`text-2xl font-black sm:text-3xl ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t('conversation_title')}</h2>
-            <p className={`mt-2 max-w-2xl text-sm leading-6 ${muted}`}>{t('conversation_description')}</p>
-          </div>
-          {messages.length > 0 && <button type="button" onClick={resetSession} className="rounded-xl border border-indigo-300 px-4 py-2 text-sm font-bold text-indigo-500 hover:bg-indigo-50 dark:hover:bg-gray-700">{t('conversation_new_session')}</button>}
+    <main className="mx-auto max-w-5xl space-y-6">
+      <header className={`rounded-3xl border p-6 sm:p-8 ${darkPanel}`}>
+        <div className="mb-3 text-4xl" aria-hidden="true">📚</div>
+        <h2 className="text-2xl font-black">{isPersian ? 'مرور و یادگیری مجدد' : 'Review & Learn Again'}</h2>
+        <p className={`mt-2 max-w-2xl text-sm leading-6 ${muted}`}>
+          {isPersian ? 'متن‌های خواندنی را دوباره بخوان، آن‌ها را خوانده‌نشده علامت بزن و واژه‌های ذخیره‌شده را برای مرور باز کن.' : 'Revisit reading articles, mark them unread when you want to return, and open saved vocabulary in your review flow.'}
+        </p>
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className={`rounded-2xl p-4 ${darkMode ? 'bg-gray-900' : 'bg-indigo-50'}`}><div className="text-2xl font-black">{unreadArticles.length}</div><div className={`mt-1 text-xs ${muted}`}>{isPersian ? 'متن خوانده‌نشده' : 'Unread articles'}</div></div>
+          <div className={`rounded-2xl p-4 ${darkMode ? 'bg-gray-900' : 'bg-green-50'}`}><div className="text-2xl font-black">{completedIds.size}</div><div className={`mt-1 text-xs ${muted}`}>{isPersian ? 'متن خوانده‌شده' : 'Read articles'}</div></div>
+          <div className={`col-span-2 rounded-2xl p-4 sm:col-span-1 ${darkMode ? 'bg-gray-900' : 'bg-amber-50'}`}><div className="text-2xl font-black">{words.length}</div><div className={`mt-1 text-xs ${muted}`}>{isPersian ? 'واژهٔ ذخیره‌شده' : 'Saved words'}</div></div>
         </div>
+      </header>
 
-        <div className="mb-6">
-          <h3 className={`mb-3 text-sm font-extrabold ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>{t('conversation_choose_level')}</h3>
-          <div className="flex flex-wrap gap-2" role="group" aria-label={t('conversation_choose_level')}>
-            {LEVELS.map((item) => <button key={item} type="button" onClick={() => setLevel(item)} disabled={messages.length > 0 || loading} aria-pressed={level === item} className={`rounded-xl border px-4 py-2 text-sm font-black transition ${level === item ? 'border-indigo-600 bg-indigo-600 text-white' : darkMode ? 'border-gray-600 text-gray-300 hover:border-indigo-400' : 'border-gray-200 text-gray-600 hover:border-indigo-400'} disabled:cursor-not-allowed disabled:opacity-50`}>{item}</button>)}
-          </div>
-        </div>
+      {error && <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
-        <div>
-          <h3 className={`mb-3 text-sm font-extrabold ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>{t('conversation_choose_scenario')}</h3>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {SCENARIOS.map((item) => <button key={item.id} type="button" onClick={() => setScenario(item.id)} disabled={messages.length > 0 || loading} aria-pressed={scenario === item.id} className={`rounded-2xl border p-4 text-left transition ${scenario === item.id ? 'border-indigo-500 bg-indigo-500/10 ring-1 ring-indigo-500' : darkMode ? 'border-gray-700 hover:border-gray-500' : 'border-gray-200 hover:border-indigo-200'} disabled:cursor-not-allowed disabled:opacity-60`}>
-              <span className="text-2xl" aria-hidden="true">{item.icon}</span>
-              <span className={`mt-2 block font-extrabold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t(item.title)}</span>
-              <span className={`mt-1 block text-sm leading-5 ${muted}`}>{t(item.description)}</span>
-            </button>)}
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h3 className="text-xl font-black">{isPersian ? 'متن‌های خواندنی' : 'Reading library'}</h3><p className={`mt-1 text-sm ${muted}`}>{isPersian ? 'هر زمان خواستی وضعیت مطالعه را تغییر بده.' : 'Change an article’s reading status whenever you like.'}</p></div>
+          <div className={`flex rounded-xl border p-1 ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`} role="group" aria-label={isPersian ? 'فیلتر متن‌ها' : 'Filter articles'}>
+            {[
+              ['unread', isPersian ? 'خوانده‌نشده' : 'Unread'],
+              ['read', isPersian ? 'خوانده‌شده' : 'Read'],
+              ['all', isPersian ? 'همه' : 'All'],
+            ].map(([value, label]) => <button key={value} type="button" onClick={() => setFilter(value)} aria-pressed={filter === value} className={`rounded-lg px-3 py-2 text-sm font-bold ${filter === value ? 'bg-indigo-600 text-white' : muted}`}>{label}</button>)}
           </div>
         </div>
-        {messages.length === 0 && <button type="button" onClick={startSession} disabled={loading} className="mt-6 w-full rounded-2xl bg-indigo-600 px-5 py-3.5 font-extrabold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60 sm:w-auto">{t('conversation_start')}</button>}
-        {error && messages.length === 0 && <p role="alert" className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm font-semibold text-red-500">{error}</p>}
+        {loading ? <p className={muted}>{isPersian ? 'در حال بارگذاری…' : 'Loading your review library…'}</p> : shownArticles.length === 0 ? (
+          <div className={`rounded-2xl border border-dashed p-6 text-center ${darkPanel}`}><p className="font-bold">{isPersian ? 'متنی در این بخش نیست.' : 'No articles in this section yet.'}</p><p className={`mt-1 text-sm ${muted}`}>{isPersian ? 'فیلتر دیگری را انتخاب کن یا از بخش مطالعه متن جدیدی باز کن.' : 'Try another filter or visit Reading to discover an article.'}</p></div>
+        ) : <div className="grid gap-4 md:grid-cols-2">
+          {shownArticles.map((article) => {
+            const isRead = completedIds.has(article.id)
+            const expanded = expandedArticle === article.id
+            return <article key={article.id} className={`flex flex-col rounded-2xl border p-5 shadow-sm ${darkPanel}`}>
+              <div className="mb-3 flex items-start justify-between gap-3"><h4 className="text-lg font-extrabold">{titleOf(article)}</h4><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${isRead ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>{isRead ? (isPersian ? 'خوانده‌شده' : 'Read') : (isPersian ? 'خوانده‌نشده' : 'Unread')}</span></div>
+              {article.level && <span className={`mb-3 text-xs font-bold ${muted}`}>{article.level}</span>}
+              <p className={`mb-4 text-sm leading-6 ${muted}`}>{article.description || article.summary || (article.content || '').slice(0, 180)}{!article.description && !article.summary && (article.content || '').length > 180 ? '…' : ''}</p>
+              {expanded && <div className={`mb-4 whitespace-pre-wrap rounded-xl p-4 text-sm leading-7 ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>{article.content || (isPersian ? 'محتوایی برای این متن ثبت نشده است.' : 'No article text is available.')}</div>}
+              <div className="mt-auto flex flex-wrap gap-2 border-t border-gray-200/60 pt-4">
+                <button type="button" onClick={() => setExpandedArticle(expanded ? null : article.id)} aria-expanded={expanded} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">{expanded ? (isPersian ? 'بستن متن' : 'Hide article') : (isPersian ? 'خواندن دوباره' : 'Read again')}</button>
+                <button type="button" disabled={savingArticle === article.id} onClick={() => markArticle(article, !isRead)} className={`rounded-xl border px-4 py-2 text-sm font-bold disabled:opacity-50 ${darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-300 hover:bg-gray-50'}`}>{savingArticle === article.id ? '…' : isRead ? (isPersian ? 'علامت‌گذاری خوانده‌نشده' : 'Mark unread') : (isPersian ? 'علامت‌گذاری خوانده‌شده' : 'Mark read')}</button>
+              </div>
+            </article>
+          })}
+        </div>}
       </section>
 
-      {messages.length > 0 && <section className={`overflow-hidden rounded-3xl border shadow-sm ${panel}`}>
-        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-700 sm:px-7">
-          <div><h3 className={`font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t('conversation_live_title')}</h3><p className={`mt-1 text-xs ${muted}`}>{t('conversation_level_scenario', { level, scenario: t(SCENARIOS.find((item) => item.id === scenario)?.title || 'conversation_scenario_daily') })}</p></div>
-          <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-500">{t('conversation_practice_badge')}</span>
-        </div>
-        <div className="max-h-[440px] space-y-4 overflow-y-auto p-5 sm:p-7" aria-live="polite">
-          {messages.map((message, index) => <div key={`${index}-${message.role}`} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[88%] rounded-2xl px-4 py-3 sm:max-w-[78%] ${message.role === 'user' ? 'bg-indigo-600 text-white' : darkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-800'}`}>
-              <p className="mb-1 text-[11px] font-black uppercase tracking-wide opacity-70">{message.role === 'user' ? t('conversation_you') : t('conversation_character')}</p>
-              <p dir="ltr" className="text-sm leading-6">{message.content}</p>
-            </div>
-          </div>)}
-          {loading && <p className={`animate-pulse text-sm font-semibold ${muted}`}>{t('conversation_thinking')}</p>}
-        </div>
-        {error && <p role="alert" className="mx-5 mb-4 rounded-xl bg-red-500/10 p-3 text-sm font-semibold text-red-500 sm:mx-7">{error}</p>}
-        <form onSubmit={(event) => { event.preventDefault(); sendTurn(draft) }} className="flex flex-col gap-3 border-t border-gray-200 p-4 dark:border-gray-700 sm:flex-row sm:p-5">
-          <label className="sr-only" htmlFor="conversation-reply">{t('conversation_input_label')}</label>
-          <input id="conversation-reply" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={1200} placeholder={t('conversation_input_placeholder')} disabled={loading} className={`min-w-0 flex-1 rounded-xl border px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 ${darkMode ? 'border-gray-600 bg-gray-900 text-white placeholder:text-gray-500' : 'border-gray-200 bg-white text-gray-900'}`} />
-          <button type="submit" disabled={loading || !draft.trim()} className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-extrabold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50">{t('conversation_send')}</button>
-        </form>
-      </section>}
-
-      {feedback && <section className={`grid grid-cols-1 gap-4 lg:grid-cols-2`}>
-        {(feedback.correctedText || feedback.explanation) && <article className={`rounded-2xl border p-5 ${panel}`}>
-          <h3 className={`mb-3 font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>✍️ {t('conversation_correction_title')}</h3>
-          {feedback.correctedText && <p dir="ltr" className="rounded-xl bg-emerald-500/10 p-3 text-sm font-semibold text-emerald-600 dark:text-emerald-300">{feedback.correctedText}</p>}
-          {feedback.explanation && <p className={`mt-3 text-sm leading-6 ${muted}`}>{feedback.explanation}</p>}
-        </article>}
-        {feedback.phrases.length > 0 && <article className={`rounded-2xl border p-5 ${panel}`}>
-          <h3 className={`mb-3 font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>💡 {t('conversation_phrases_title')}</h3>
-          <ul className="space-y-3">{feedback.phrases.map((item, index) => <li key={`${item.phrase}-${index}`} className={`rounded-xl p-3 ${darkMode ? 'bg-gray-900/70' : 'bg-gray-50'}`}>
-            <p dir="ltr" className="font-bold text-indigo-500">{item.phrase}</p><p className={`mt-1 text-sm ${muted}`}>{item.meaning}</p>
-          </li>)}</ul>
-        </article>}
-      </section>}
-    </div>
+      <section className="space-y-4">
+        <div><h3 className="text-xl font-black">{isPersian ? 'واژه‌های ذخیره‌شده برای مرور' : 'Saved vocabulary to review'}</h3><p className={`mt-1 text-sm ${muted}`}>{isPersian ? 'برای باز کردن کارت مرور هر واژه روی آن بزن.' : 'Open any saved word in the existing vocabulary review flow.'}</p></div>
+        {!loading && words.length === 0 ? <div className={`rounded-2xl border border-dashed p-6 text-center ${darkPanel}`}><p className="font-bold">{isPersian ? 'هنوز واژه‌ای ذخیره نکرده‌ای.' : 'No saved words yet.'}</p><p className={`mt-1 text-sm ${muted}`}>{isPersian ? 'هنگام مطالعه، واژه‌ها را ذخیره کن تا اینجا برای مرور نمایش داده شوند.' : 'Save words while studying and they will appear here for review.'}</p></div> : <div className="grid gap-3 sm:grid-cols-2">
+          {words.map((word) => <div key={word.id} className={`flex items-center justify-between gap-3 rounded-2xl border p-4 ${darkPanel}`}><div className="min-w-0"><p className="break-words font-extrabold">{wordOf(word) || (isPersian ? 'واژه' : 'Vocabulary word')}</p><p className={`mt-1 break-words text-sm ${muted}`}>{translationOf(word) || (isPersian ? 'بدون معنی ثبت‌شده' : 'No translation saved')}</p>{word.next_review && <p className={`mt-1 text-xs ${muted}`}>{isPersian ? 'مرور بعدی: ' : 'Next review: '}{new Date(word.next_review).toLocaleDateString(isPersian ? 'fa-IR' : 'en-US')}</p>}</div><button type="button" onClick={() => onStartWordReview?.(word)} disabled={!word.id || !onStartWordReview} className="shrink-0 rounded-xl bg-amber-500 px-3 py-2 text-sm font-bold text-white hover:bg-amber-600 disabled:opacity-50">{isPersian ? 'مرور' : 'Review'}</button></div>)}
+        </div>}
+      </section>
+      <div className="flex justify-end"><button type="button" onClick={loadData} disabled={loading} className={`rounded-xl border px-4 py-2 text-sm font-bold disabled:opacity-50 ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}>{isPersian ? 'تازه‌سازی' : 'Refresh'}</button></div>
+    </main>
   )
 }
