@@ -9,7 +9,7 @@ class WritingSubmission(models.Model):
     feedback = models.TextField(blank=True, null=True)
     score = models.IntegerField(blank=True, null=True, default=None)
     # Structured, actionable mistakes returned by the correction service.
-    # Existing submissions naturally default to an empty list.
+    # Legacy submissions remain null; new analyses store a list, even when empty.
     mistakes = models.JSONField(null=True, blank=True, default=None)
     created_at = models.DateTimeField(auto_now_add=True)
 
