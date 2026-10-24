@@ -454,11 +454,9 @@ def submit_quiz(request):
                             "example_translation", "common_mistake",
                         )
                     },
-                    "user_answer_text": next(
-                        (
-                            getattr(questions[detail["question_id"]], "option_" + str(detail.get("user_answer", "")).lower(), "")
-                            for _ in (0,)
-                        ),
+                    "user_answer_text": getattr(
+                        questions[detail["question_id"]],
+                        "option_" + str(detail.get("user_answer", "")).lower(),
                         "",
                     ),
                 }
