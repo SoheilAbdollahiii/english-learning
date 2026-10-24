@@ -99,6 +99,7 @@ export default function ConversationLab({ darkMode }) {
           </div>
         </div>
         {messages.length === 0 && <button type="button" onClick={startSession} disabled={loading} className="mt-6 w-full rounded-2xl bg-indigo-600 px-5 py-3.5 font-extrabold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60 sm:w-auto">{t('conversation_start')}</button>}
+        {error && messages.length === 0 && <p role="alert" className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm font-semibold text-red-500">{error}</p>}
       </section>
 
       {messages.length > 0 && <section className={`overflow-hidden rounded-3xl border shadow-sm ${panel}`}>
