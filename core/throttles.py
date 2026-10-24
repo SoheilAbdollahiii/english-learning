@@ -17,3 +17,13 @@ class WritingCorrectionThrottle(UserRateThrottle):
         if request.method != "POST":
             return True
         return super().allow_request(request, view)
+
+
+class ConversationThrottle(UserRateThrottle):
+    """Limit per-account role-play turns to control model cost and abuse."""
+    scope = "conversation"
+
+    def allow_request(self, request, view):
+        if request.method != "POST":
+            return True
+        return super().allow_request(request, view)
