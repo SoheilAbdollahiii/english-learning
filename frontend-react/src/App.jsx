@@ -4,6 +4,49 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 
 import { apiFetch, apiUrl } from './api'
 
+const THEMATIC_VOCABULARY_SETS = [
+  {
+    id: 'daily', icon: '💬', title: { en: 'Everyday conversations', fa: 'مکالمات روزمره و اصطلاحات طبیعی' },
+    description: { en: 'Sound natural in small talk and daily interactions.', fa: 'برای گفت‌وگوهای کوتاه و تعامل‌های روزانه طبیعی‌تر صحبت کن.' },
+    words: [
+      ['actually','در واقع','A2'], ['by the way','راستی','A2'], ['sounds good','خوبه، موافقم','A2'], ['no worries','اشکالی نداره','A2'],
+      ['hang out','وقت گذراندن با دوستان','B1'], ['figure out','فهمیدن، راه‌حل پیدا کردن','B1'], ['catch up','از حال هم باخبر شدن','B1'], ['make sense','منطقی بودن','B1'],
+    ],
+  },
+  {
+    id: 'travel', icon: '✈️', title: { en: 'Travel, airport & hotel', fa: 'سفر، فرودگاه و هتل' },
+    description: { en: 'Handle check-in, directions, bookings and travel problems.', fa: 'از پذیرش و مسیر پرسیدن تا رزرو و مشکلات سفر را مدیریت کن.' },
+    words: [
+      ['boarding pass','کارت پرواز','A1'], ['departure','حرکت، زمان پرواز','A1'], ['arrival','ورود','A1'], ['luggage','بار و چمدان','A1'],
+      ['reservation','رزرو','A2'], ['check in','پذیرش شدن','A2'], ['delayed','با تأخیر','A2'], ['aisle seat','صندلی کنار راهرو','B1'],
+    ],
+  },
+  {
+    id: 'work', icon: '💼', title: { en: 'Work, meetings & interviews', fa: 'کار، جلسات و مصاحبه' },
+    description: { en: 'Use clear, professional English with colleagues and recruiters.', fa: 'در محیط کار، جلسه‌ها و مصاحبه‌ها حرفه‌ای و روشن صحبت کن.' },
+    words: [
+      ['deadline','مهلت نهایی','A2'], ['colleague','همکار','A2'], ['agenda','دستور جلسه','B1'], ['feedback','بازخورد','B1'],
+      ['follow up','پیگیری کردن','B1'], ['come up with','ارائه دادن، به ذهن رسیدن','B1'], ['negotiate','مذاکره کردن','B2'], ['strengths','نقاط قوت','B1'],
+    ],
+  },
+  {
+    id: 'academic', icon: '🎓', title: { en: 'University & language exams', fa: 'دانشگاه و آزمون‌های زبان' },
+    description: { en: 'Build vocabulary for lectures, essays, research and exams.', fa: 'واژگان کاربردی برای کلاس، مقاله، پژوهش و آزمون‌ها یاد بگیر.' },
+    words: [
+      ['assignment','تکلیف','A2'], ['lecture','سخنرانی، کلاس دانشگاه','A2'], ['research','پژوهش','B1'], ['evidence','مدرک، شواهد','B1'],
+      ['analyse','تحلیل کردن','B1'], ['significant','قابل‌توجه، مهم','B2'], ['hypothesis','فرضیه','C1'], ['evaluate','ارزیابی کردن','B2'],
+    ],
+  },
+  {
+    id: 'phrasal', icon: '🧩', title: { en: 'Phrasal verbs & collocations', fa: 'افعال عبارتی و ترکیب‌های رایج' },
+    description: { en: 'Learn useful word combinations instead of isolated words.', fa: 'به‌جای حفظ واژه‌های جدا، ترکیب‌های طبیعی و پرکاربرد یاد بگیر.' },
+    words: [
+      ['give up','تسلیم شدن، دست کشیدن','A2'], ['look after','مراقبت کردن از','A2'], ['put off','به تعویق انداختن','B1'], ['run out of','تمام کردن، تمام شدنِ','B1'],
+      ['take responsibility','مسئولیت پذیرفتن','B1'], ['pay attention','توجه کردن','A2'], ['reach a decision','به تصمیم رسیدن','B2'], ['highly unlikely','بسیار بعید','C1'],
+    ],
+  },
+]
+
 export default function App() {
   const { t, i18n } = useTranslation()
   const [activeTab, setActiveTab] = useState(() => {
@@ -45,6 +88,7 @@ export default function App() {
   const [readingLevel, setReadingLevel] = useState('all')
   const [vocabQuery, setVocabQuery] = useState('')
   const [vocabLevel, setVocabLevel] = useState('all')
+  const [selectedVocabularySet, setSelectedVocabularySet] = useState('all')
   const [selectedVocabularyWord, setSelectedVocabularyWord] = useState(null)
   const [vocabularyDictionary, setVocabularyDictionary] = useState(null)
   const [vocabularyDictionaryLoading, setVocabularyDictionaryLoading] = useState(false)
@@ -880,14 +924,26 @@ export default function App() {
     return matchesQuery && (readingLevel === 'all' || article.level === readingLevel)
   })
 
+  const activeVocabularySet = THEMATIC_VOCABULARY_SETS.find((set) => set.id === selectedVocabularySet) || null
+  const thematicVocabularyItems = activeVocabularySet
+    ? activeVocabularySet.words.map(([english_word, translation, level]) => ({
+      english_word, translation, level, proficiency: 0, example: '', isPersonal: false, isThematic: true,
+      key: `thematic-${activeVocabularySet.id}-${english_word}`,
+    }))
+    : []
   const vocabularyItems = [
     ...personalWords.map((word) => ({ ...word, isPersonal: true, key: `personal-${word.id}` })),
     ...words
       .filter((word) => !personalWords.some((saved) => saved.english_word.toLowerCase() === word.english_word.toLowerCase()))
       .map((word) => ({ ...word, isPersonal: false, key: `curated-${word.id}` })),
+    ...thematicVocabularyItems.filter((thematicWord) =>
+      !personalWords.some((saved) => saved.english_word.toLowerCase() === thematicWord.english_word.toLowerCase())
+      && !words.some((word) => word.english_word.toLowerCase() === thematicWord.english_word.toLowerCase())
+    ),
   ].filter((word) => {
     const matchesQuery = `${word.english_word} ${word.translation || ''}`.toLowerCase().includes(vocabQuery.trim().toLowerCase())
-    return matchesQuery && (vocabLevel === 'all' || word.level === vocabLevel)
+    const matchesSet = !activeVocabularySet || activeVocabularySet.words.some(([term]) => term.toLowerCase() === word.english_word.toLowerCase())
+    return matchesQuery && matchesSet && (vocabLevel === 'all' || word.level === vocabLevel)
   })
 
   useEffect(() => {
@@ -1530,6 +1586,30 @@ export default function App() {
                       </button>
                     </div>
                   )}
+                </section>
+                <section aria-labelledby="thematic-vocabulary-title" className={`rounded-3xl border p-4 md:p-6 space-y-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 id="thematic-vocabulary-title" className="text-xl font-black">{i18n.language === 'fa' ? 'مجموعه‌های موضوعی لغات' : 'Thematic vocabulary collections'}</h3>
+                      <p className={`mt-1 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{i18n.language === 'fa' ? 'با توجه به هدف خود یک مجموعه انتخاب کن و واژه‌ها را در بافت مرتبط یاد بگیر.' : 'Choose a collection for your goal and learn words in a useful context.'}</p>
+                    </div>
+                    <button type="button" onClick={() => setSelectedVocabularySet('all')} aria-pressed={selectedVocabularySet === 'all'} className={`rounded-xl border px-3 py-2 text-sm font-bold ${selectedVocabularySet === 'all' ? 'border-indigo-500 bg-indigo-600 text-white' : darkMode ? 'border-gray-600' : 'border-gray-200'}`}>{i18n.language === 'fa' ? 'همهٔ واژه‌ها' : 'All words'}</button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {THEMATIC_VOCABULARY_SETS.map((set) => {
+                      const selected = selectedVocabularySet === set.id
+                      const savedCount = set.words.filter(([term]) => personalWords.some((word) => word.english_word.toLowerCase() === term.toLowerCase())).length
+                      return <button key={set.id} type="button" onClick={() => { setSelectedVocabularySet(set.id); setVocabQuery(''); setVocabLevel('all') }} aria-pressed={selected} className={`text-left rounded-2xl border p-4 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 ${selected ? 'border-indigo-500 bg-indigo-500/10 ring-2 ring-indigo-500/20' : darkMode ? 'border-gray-700 hover:border-indigo-700 bg-gray-900/30' : 'border-gray-200 hover:border-indigo-300 bg-gray-50'}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="text-2xl" aria-hidden="true">{set.icon}</span>
+                          <span className="rounded-full bg-indigo-500/10 px-2.5 py-1 text-xs font-bold text-indigo-500">{set.words.length} {i18n.language === 'fa' ? 'واژه' : 'words'}</span>
+                        </div>
+                        <h4 className="mt-3 font-extrabold">{set.title[i18n.language === 'fa' ? 'fa' : 'en']}</h4>
+                        <p className={`mt-1 text-sm leading-5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{set.description[i18n.language === 'fa' ? 'fa' : 'en']}</p>
+                        <p className="mt-3 text-xs font-bold text-indigo-500">{savedCount} {i18n.language === 'fa' ? 'ذخیره‌شده در واژه‌های من' : 'already saved'}</p>
+                      </button>
+                    })}
+                  </div>
                 </section>
                 <div className={`grid grid-cols-1 md:grid-cols-[1fr_180px] gap-3 p-4 rounded-2xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                   <input value={vocabQuery} onChange={(event) => setVocabQuery(event.target.value)} placeholder={t('search_words')} className={`w-full rounded-xl border px-4 py-3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`} />
