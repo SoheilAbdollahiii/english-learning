@@ -2890,7 +2890,7 @@ export default function App() {
                         <div className="rounded-xl bg-white/80 dark:bg-gray-800 p-4 space-y-3">
                           <h5 className="font-bold">🔎 {t('common_mistakes_title')}</h5>
                           {quizResult.analysis.common_mistakes?.length ? (
-                            <ul className="space-y-3">{quizResult.analysis.common_mistakes.map((item, index) => <li key={`${item.topic}-${index}`} className="text-sm"><div className="flex justify-between gap-3"><span>{item.mistake}</span><span className="shrink-0 rounded-full bg-rose-100 dark:bg-rose-950 px-2 py-0.5 font-bold">{t('mistake_count', { count: item.count })}</span></div><p className="mt-1 text-xs text-gray-500">{t('topic_label')}: {item.topic}</p></li>)}</ul>
+                            <ul className="space-y-3">{quizResult.analysis.common_mistakes.map((item, index) => <li key={`${item.topic}-${index}`} className="text-sm"><div className="flex justify-between gap-3"><span>{item.mistake}</span><span className="shrink-0 rounded-full bg-rose-100 dark:bg-rose-950 px-2 py-0.5 font-bold">{t('quiz_mistake_count', { count: item.count })}</span></div><p className="mt-1 text-xs text-gray-500">{t('topic_label')}: {item.topic}</p></li>)}</ul>
                           ) : <p className="text-sm text-gray-500">{t('no_common_mistakes')}</p>}
                         </div>
                         <div className="rounded-xl bg-white/80 dark:bg-gray-800 p-4 space-y-2">
