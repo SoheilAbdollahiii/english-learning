@@ -205,8 +205,8 @@ export default function MistakeNotebook({ darkMode }) {
             </div>
             <h2 className="text-3xl font-black tracking-tight sm:text-4xl">{isPersian ? 'دفترچهٔ خطاهای من' : 'My mistake notebook'}</h2>
             <p className={`mt-3 max-w-xl text-sm leading-7 sm:text-base ${muted}`}>{isPersian
-              ? 'اشتباه‌ها و واژه‌های فراموش‌شده‌ات اینجا کنار هم جمع می‌شوند. اول جواب را به خاطر بیاور؛ بعد پاسخ و توضیح را باز کن.'
-              : 'Your writing mistakes and forgotten vocabulary live together here. Recall the answer first, then reveal the correction and explanation.'}</p>
+              ? 'پاسخ‌های اشتباه آزمون، اصلاح‌های نوشتاری و واژه‌های فراموش‌شده‌ات اینجا کنار هم جمع می‌شوند. اول خودت جواب را به یاد بیاور؛ بعد پاسخ درست را ببین.'
+              : 'Wrong quiz answers, writing corrections, and forgotten vocabulary live together here. Recall the answer first, then reveal the correction and explanation.'}</p>
           </div>
           <button type="button" onClick={loadWritings} disabled={loading} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-extrabold text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-700 disabled:opacity-50">
             <span aria-hidden="true">↻</span>{isPersian ? 'همگام‌سازی دوباره' : 'Sync notebook'}
@@ -266,7 +266,7 @@ export default function MistakeNotebook({ darkMode }) {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-500/10 text-3xl">📚</div>
           <h3 className="text-lg font-black">{filter === 'saved' ? (isPersian ? 'هنوز موردی نشان‌گذاری نکرده‌ای' : 'Nothing saved for later yet') : (isPersian ? 'موردی برای نمایش پیدا نشد' : 'No matching items found')}</h3>
           <p className={`mx-auto mt-2 max-w-lg text-sm leading-6 ${muted}`}>{isPersian
-            ? 'هر واژه‌ای را به «واژگان من» اضافه کنی، اینجا هم نمایش داده می‌شود. اگر هنگام مرور گزینهٔ «یادم نبود» را بزنی، تعداد فراموشی آن ثبت و اینجا مشخص می‌شود.'
+            ? 'هر واژه‌ای را به «واژگان من» اضافه کنی، اینجا نمایش داده می‌شود؛ پاسخ‌های اشتباه آزمون و اصلاح‌های نوشتاری هم برای مرور کنار آن قرار می‌گیرند.'
             : 'Every word saved to My Vocabulary appears here too. When you choose “Forgot” during review, its forgotten count is recorded and shown here.'}</p>
         </div>
       ) : (
@@ -288,7 +288,7 @@ export default function MistakeNotebook({ darkMode }) {
 
                 <div className={`rounded-2xl p-4 sm:p-5 ${darkMode ? 'bg-gray-900/80' : 'bg-slate-50'}`}>
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <p className={`text-[11px] font-extrabold uppercase tracking-wider ${muted}`}>{item.vocabulary ? (isPersian ? 'واژه برای یادآوری' : 'Recall this word') : (isPersian ? 'جمله یا عبارت اولیه' : 'Original phrase')}</p>
+                    <p className={`text-[11px] font-extrabold uppercase tracking-wider ${muted}`}>{item.vocabulary ? (isPersian ? 'واژه برای یادآوری' : 'Recall this word') : item.quiz ? (isPersian ? 'سؤال آزمون' : 'Quiz question') : (isPersian ? 'جمله یا عبارت اولیه' : 'Original phrase')}</p>
                     {dateLabel && <span className={`text-[11px] ${muted}`}>{dateLabel}</span>}
                   </div>
                   <p dir="ltr" className="break-words whitespace-pre-wrap text-base font-bold leading-7 sm:text-lg">{item.original}</p>
