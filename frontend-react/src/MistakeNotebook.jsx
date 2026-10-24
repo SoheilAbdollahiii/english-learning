@@ -12,6 +12,7 @@ const CATEGORY_LABELS = {
   spelling: { en: 'Spelling', fa: 'املاء' },
   style: { en: 'Style', fa: 'سبک نگارش' },
   other: { en: 'Other', fa: 'سایر' },
+  vocabulary: { en: 'My vocabulary', fa: 'واژگان من' },
 }
 
 function readSavedIds() {
@@ -52,6 +53,7 @@ export default function MistakeNotebook({ darkMode }) {
   const { i18n } = useTranslation()
   const isPersian = (i18n.resolvedLanguage || i18n.language || '').toLowerCase().startsWith('fa')
   const [writings, setWritings] = useState([])
+  const [vocabularyWords, setVocabularyWords] = useState([])
   const [savedIds, setSavedIds] = useState(readSavedIds)
   const [filter, setFilter] = useState('all')
   const [category, setCategory] = useState('all')
@@ -66,13 +68,24 @@ export default function MistakeNotebook({ darkMode }) {
     setLoading(true)
     setError('')
     try {
-      const response = await apiFetch(apiUrl('/writing/api/writings/'))
-      const data = await response.json()
-      if (!response.ok) {
-        const message = data.detail || (isPersian ? 'بارگذاری نوشته‌ها ناموفق بود.' : 'Could not load your writing history.')
+      const [writingResponse, vocabularyResponse] = await Promise.all([
+        apiFetch(apiUrl('/writing/api/writings/')),
+        apiFetch(apiUrl('/vocabulary/api/my-words/')),
+      ])
+      const [writingData, vocabularyData] = await Promise.all([
+        writingResponse.json(),
+        vocabularyResponse.json(),
+      ])
+      if (!writingResponse.ok) {
+        const message = writingData.detail || (isPersian ? 'بارگذاری نوشته‌ها ناموفق بود.' : 'Could not load your writing history.')
         throw new Error(message)
       }
-      setWritings(Array.isArray(data) ? data : [])
+      if (!vocabularyResponse.ok) {
+        const message = vocabularyData.detail || (isPersian ? 'بارگذاری واژگان شخصی ناموفق بود.' : 'Could not load your saved vocabulary.')
+        throw new Error(message)
+      }
+      setWritings(Array.isArray(writingData) ? writingData : [])
+      setVocabularyWords(Array.isArray(vocabularyData) ? vocabularyData : [])
     } catch (err) {
       setError(err.message || (isPersian ? 'دریافت نوشته‌ها انجام نشد.' : 'Could not load your writing history.'))
     } finally {
@@ -89,7 +102,33 @@ export default function MistakeNotebook({ darkMode }) {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(savedIds)) } catch { /* Storage may be unavailable. */ }
   }, [savedIds])
 
-  const mistakes = useMemo(() => writings.flatMap(getMistakes), [writings])
+  const vocabularyEntries = useMemo(() => vocabularyWords.map((word) => {
+    const forgotten = Number(word.incorrect_count) > 0
+    const example = (word.example || '').trim()
+    const reviewHistory = isPersian
+      ? `تعداد مرور: ${word.review_count || 0}؛ دفعاتی که یادت نیامده: ${word.incorrect_count || 0}.`
+      : `Reviews: ${word.review_count || 0}; times forgotten: ${word.incorrect_count || 0}.`
+    return {
+      key: `vocabulary:${word.id}`,
+      original: word.english_word,
+      correction: word.translation || (isPersian ? 'هنوز ترجمه‌ای ثبت نشده است.' : 'No translation saved yet.'),
+      explanation: [example, reviewHistory].filter(Boolean).join('\\n\\n'),
+      category: 'vocabulary',
+      word,
+      vocabulary: true,
+      forgotten,
+      writing: {
+        id: `vocabulary-${word.id}`,
+        original_text: word.english_word,
+        created_at: word.created_at,
+        score: null,
+      },
+    }
+  }), [vocabularyWords, isPersian])
+  const mistakes = useMemo(() => [
+    ...writings.flatMap(getMistakes),
+    ...vocabularyEntries,
+  ], [writings, vocabularyEntries])
   const entries = useMemo(() => mistakes
     .filter((item) => filter !== 'saved' || savedIds.includes(item.key))
     .filter((item) => category === 'all' || item.category === category)
@@ -163,6 +202,7 @@ export default function MistakeNotebook({ darkMode }) {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-900">{label(item.category)}</span>
+                {item.vocabulary && item.forgotten && <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-800">{isPersian ? 'قبلاً فراموش شده' : 'Forgotten before'}</span>}
                 <span className={`text-xs ${muted}`}>{Number.isNaN(created.getTime()) ? '' : created.toLocaleDateString(isPersian ? 'fa-IR' : 'en-US')}</span>
               </div>
               <button type="button" onClick={() => toggleSaved(item.key)} aria-pressed={isSaved} className={`rounded-xl border px-3 py-1.5 text-xs font-bold ${isSaved ? 'border-amber-400 bg-amber-100 text-amber-900' : darkMode ? 'border-gray-600' : 'border-gray-300'}`}>{isSaved ? (isPersian ? '★ ذخیره‌شده' : '★ Saved') : (isPersian ? '☆ ذخیره برای مرور' : '☆ Save for review')}</button>
@@ -179,7 +219,8 @@ export default function MistakeNotebook({ darkMode }) {
               </div>
             ) : <div className={`rounded-xl border border-dashed p-4 text-center text-sm ${muted}`}>{isPersian ? 'پاسخ پنهان است؛ پیش از دیدن اصلاح، خودت تلاش کن.' : 'Answer hidden. Try to correct it before revealing the answer.'}</div>}
             <div className="flex flex-wrap items-center justify-between gap-3">
-              {item.writing.score != null && <span className={`text-xs ${muted}`}>{isPersian ? 'امتیاز نوشته' : 'Writing score'}: {item.writing.score}/100</span>}
+              {item.vocabulary && <span className={`text-xs ${muted}`}>{isPersian ? 'سطح تسلط' : 'Proficiency'}: {item.word.proficiency || 0}/100</span>}
+              {!item.vocabulary && item.writing.score != null && <span className={`text-xs ${muted}`}>{isPersian ? 'امتیاز نوشته' : 'Writing score'}: {item.writing.score}/100</span>}
               <button type="button" onClick={() => toggleReveal(item.key)} className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700">{isRevealed ? (isPersian ? 'پنهان‌کردن پاسخ' : 'Hide answer') : (isPersian ? 'نمایش اصلاح و دلیل' : 'Reveal correction and reason')}</button>
             </div>
           </article>
