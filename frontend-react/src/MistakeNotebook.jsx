@@ -5,7 +5,6 @@ import { apiFetch, apiUrl } from './api'
 const STORAGE_KEY = 'english-learning-saved-writing-mistakes-v2'
 const CATEGORY_LABELS = {
   grammar: { en: 'Grammar', fa: 'دستور زبان' },
-  vocabulary: { en: 'Vocabulary', fa: 'واژگان' },
   word_choice: { en: 'Word choice', fa: 'انتخاب واژه' },
   word_order: { en: 'Word order', fa: 'ترتیب واژه‌ها' },
   punctuation: { en: 'Punctuation', fa: 'نشانه‌گذاری' },
@@ -112,7 +111,7 @@ export default function MistakeNotebook({ darkMode }) {
       key: `vocabulary:${word.id}`,
       original: word.english_word,
       correction: word.translation || (isPersian ? 'هنوز ترجمه‌ای ثبت نشده است.' : 'No translation saved yet.'),
-      explanation: [example, reviewHistory].filter(Boolean).join('\\n\\n'),
+      explanation: [example, reviewHistory].filter(Boolean).join('\n\n'),
       category: 'vocabulary',
       word,
       vocabulary: true,
@@ -192,7 +191,7 @@ export default function MistakeNotebook({ darkMode }) {
         {loading ? <p className={muted}>{isPersian ? 'در حال بارگذاری دفترچه…' : 'Loading your notebook…'}</p> : entries.length === 0 ? (
           <div className={`rounded-2xl border border-dashed p-8 text-center ${panel}`}>
             <p className="font-bold">{filter === 'saved' ? (isPersian ? 'هنوز موردی برای مرور ذخیره نکرده‌ای.' : 'You have not saved any mistakes for review yet.') : (isPersian ? 'خطایی برای نمایش پیدا نشد.' : 'No mistakes match these filters.')}</p>
-            <p className={`mt-2 text-sm ${muted}`}>{isPersian ? 'یک نوشته را با موفقیت تصحیح کن؛ خطاهای مشخص‌شده به‌صورت کارت‌های جداگانه در اینجا نمایش داده می‌شوند.' : 'Correct a writing successfully. Identified mistakes will appear here as separate review cards.'}</p>
+            <p className={`mt-2 text-sm ${muted}`}>{isPersian ? 'یک نوشته را تصحیح کن یا واژه‌ای را در «واژگان من» ذخیره کن؛ خطاهای نوشته و واژه‌های شخصی اینجا جمع می‌شوند.' : 'Correct a writing or save a word to My Vocabulary. Writing mistakes and saved vocabulary appear here as separate review cards.'}</p>
           </div>
         ) : entries.map((item) => {
           const isRevealed = Boolean(revealed[item.key])
