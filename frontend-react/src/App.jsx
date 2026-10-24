@@ -1666,12 +1666,11 @@ export default function App() {
   })
 
   const activeVocabularySet = THEMATIC_VOCABULARY_SETS.find((set) => set.id === selectedVocabularySet) || null
-  const thematicVocabularyItems = activeVocabularySet
-    ? activeVocabularySet.words.map(([english_word, translation, level]) => ({
+  const thematicVocabularyItems = (activeVocabularySet ? [activeVocabularySet] : THEMATIC_VOCABULARY_SETS)
+    .flatMap((set) => set.words.map(([english_word, translation, level]) => ({
       english_word, translation, level, proficiency: 0, example: '', isPersonal: false, isThematic: true,
-      key: `thematic-${activeVocabularySet.id}-${english_word}`,
-    }))
-    : []
+      key: `thematic-${set.id}-${english_word}`,
+    })))
   const vocabularyItems = [
     ...personalWords.map((word) => ({ ...word, isPersonal: true, key: `personal-${word.id}` })),
     ...words
