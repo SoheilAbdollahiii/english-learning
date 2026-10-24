@@ -11,6 +11,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="writingsubmission",
             name="mistakes",
-            field=models.JSONField(blank=True, default=list),
+            field=models.JSONField(blank=True, default=None, null=True),
         ),
     ]
