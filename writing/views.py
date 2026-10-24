@@ -97,11 +97,15 @@ def writing_submit(request):
     )
 
 
-@api_view(["GET", "POST"])
+@api_view(["GET", "POST", "DELETE"])
 @permission_classes([IsAuthenticated])
 @throttle_classes([WritingCorrectionThrottle])
 def manage_writings(request):
     """JWT-authenticated API scoped to the authenticated user's submissions."""
+    if request.method == "DELETE":
+        deleted_count, _ = WritingSubmission.objects.filter(user=request.user).delete()
+        return Response({"deleted_count": deleted_count}, status=200)
+
     if request.method == "GET":
         writings = WritingSubmission.objects.filter(user=request.user).order_by("-created_at")
         return Response(WritingSubmissionSerializer(writings, many=True).data)
