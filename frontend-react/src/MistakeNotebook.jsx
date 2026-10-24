@@ -24,7 +24,8 @@ function readSavedIds() {
 }
 
 function getMistakes(writing) {
-  if (Array.isArray(writing.mistakes) && writing.mistakes.length) {
+  if (Array.isArray(writing.mistakes)) {
+    // An empty array means the new analyzer found no meaningful mistakes.
     return writing.mistakes.map((mistake, index) => ({
       ...mistake,
       key: `${writing.id}:mistake:${index}`,
@@ -32,7 +33,7 @@ function getMistakes(writing) {
       legacy: false,
     }))
   }
-  // Keep older submissions usable after the structured-mistake feature is deployed.
+  // Only pre-feature records (null/missing mistakes field) use whole-text fallback.
   if (writing.original_text && writing.corrected_text) {
     return [{
       key: `${writing.id}:whole-writing`,
@@ -122,7 +123,7 @@ export default function MistakeNotebook({ darkMode }) {
             <div className={`mt-1 text-xs ${muted}`}>{isPersian ? 'خطاهای قابل مرور' : 'Reviewable mistakes'}</div>
           </div>
           <div className={`rounded-2xl p-4 ${darkMode ? 'bg-gray-900' : 'bg-amber-50'}`}>
-            <div className="text-2xl font-black">{savedIds.length}</div>
+            <div className="text-2xl font-black">{mistakes.filter((item) => savedIds.includes(item.key)).length}</div>
             <div className={`mt-1 text-xs ${muted}`}>{isPersian ? 'ذخیره‌شده برای مرور' : 'Saved for review'}</div>
           </div>
           <div className={`col-span-2 rounded-2xl p-4 sm:col-span-1 ${darkMode ? 'bg-gray-900' : 'bg-green-50'}`}>
