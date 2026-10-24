@@ -251,6 +251,7 @@ export default function App() {
   }
 
   const toggleLanguage = () => {
+    setVocabularyExampleTranslations({})
     const nextLanguage = i18n.language === 'en' ? 'fa' : 'en'
     localStorage.setItem('english-learning-language', nextLanguage)
     i18n.changeLanguage(nextLanguage)
@@ -947,19 +948,9 @@ export default function App() {
   })
 
   useEffect(() => {
-    if (!selectedVocabularyWord?.english_word) {
-      setVocabularyDictionary(null)
-      setVocabularyDictionaryError('')
-      setVocabularyDictionaryLoading(false)
-      setVocabularyRelatedWords({ synonyms: [], antonyms: [], collocations: [] })
-      return undefined
-    }
+    if (!selectedVocabularyWord?.english_word) return undefined
     let cancelled = false
     const word = selectedVocabularyWord.english_word.trim().toLowerCase()
-    setVocabularyDictionary(null)
-    setVocabularyDictionaryError('')
-    setVocabularyDictionaryLoading(true)
-    setVocabularyRelatedWords({ synonyms: [], antonyms: [], collocations: [] })
 
     const loadDictionaryEntry = async () => {
       let dictionaryEntry = null
@@ -1055,7 +1046,6 @@ export default function App() {
       .flatMap((definition) => [definition.definition, definition.example])
       .filter((text, index, all) => text && all.indexOf(text) === index)
       .slice(0, 14)
-    setVocabularyExampleTranslations({})
     if (i18n.language !== 'fa' || dictionaryText.length === 0) return undefined
     const translateDictionaryText = async () => {
       const translations = await Promise.all(dictionaryText.map(async (text) => [text, await translateEnglishToPersian(text)]))
@@ -1368,7 +1358,12 @@ export default function App() {
                           if (!items.length) return null
                           return <section key={key} className="space-y-2">
                             <h3 className="font-extrabold">{t(key === 'synonyms' ? 'word_synonyms' : key === 'antonyms' ? 'word_antonyms' : 'word_collocations')}</h3>
-                            <div className="flex flex-wrap gap-2">{items.map((item) => <button key={item} type="button" onClick={() => handleWordClick(item)} className={`rounded-full border px-3 py-2 text-sm font-semibold transition hover:border-indigo-500 ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`} dir="ltr">{item}</button>)}</div>
+                            <div className="flex flex-wrap gap-2">
+                              {items.map((item) => (
+                                // eslint-disable-next-line react-hooks/refs -- This callback only runs after a user click.
+                                <button key={item} type="button" onClick={() => { void handleWordClick(item) }} className={`rounded-full border px-3 py-2 text-sm font-semibold transition hover:border-indigo-500 ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`} dir="ltr">{item}</button>
+                              ))}
+                            </div>
                           </section>
                         })}
                         <section className="space-y-2">
@@ -1628,7 +1623,7 @@ export default function App() {
                       <div className="flex items-center gap-2">
                         <span className="rounded-full bg-indigo-500/10 px-3 py-1 text-sm font-bold text-indigo-500">{selectedVocabularyWord.level || 'B1'} · {i18n.language === 'fa' ? 'سطح تقریبی CEFR' : 'estimated CEFR'}</span>
                         <button type="button" onClick={() => speakVocabularyWord(selectedVocabularyWord)} className="rounded-xl border px-3 py-2 font-bold hover:border-indigo-500" aria-label={i18n.language === 'fa' ? 'شنیدن تلفظ واژه' : 'Listen to pronunciation'}>🔊 {i18n.language === 'fa' ? 'تلفظ' : 'Listen'}</button>
-                        <button type="button" onClick={() => setSelectedVocabularyWord(null)} className="rounded-xl border px-3 py-2 font-bold" aria-label={i18n.language === 'fa' ? 'بستن راهنمای واژه' : 'Close word guide'}>✕</button>
+                        <button type="button" onClick={() => { setSelectedVocabularyWord(null); setVocabularyDictionary(null); setVocabularyDictionaryError(''); setVocabularyDictionaryLoading(false); setVocabularyRelatedWords({ synonyms: [], antonyms: [], collocations: [] }); setVocabularyExampleTranslations({}) }} className="rounded-xl border px-3 py-2 font-bold" aria-label={i18n.language === 'fa' ? 'بستن راهنمای واژه' : 'Close word guide'}>✕</button>
                       </div>
                     </div>
                     <p className={`rounded-xl p-3 text-sm ${darkMode ? 'bg-gray-900/50 text-gray-300' : 'bg-indigo-50 text-gray-700'}`}>{i18n.language === 'fa' ? 'راهنمای تلفظ: روی دکمهٔ «تلفظ» بزنید. تلفظ صوتی از صدای انگلیسی مرورگر استفاده می‌کند و ممکن است به پشتیبانی مرورگر وابسته باشد.' : 'Pronunciation: select Listen to hear the word using your browser’s English voice. Available voices depend on your device and browser.'}</p>
@@ -1694,7 +1689,7 @@ export default function App() {
                       <div className={`absolute top-0 right-0 w-16 h-16 rounded-bl-full -z-10 ${darkMode ? 'bg-indigo-950/50' : 'bg-indigo-50'}`}></div>
                       
                       <div className="flex justify-between items-start mb-1">
-                        <button type="button" onClick={() => { setSelectedVocabularyWord(word); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className={`text-left text-2xl font-black tracking-tight underline-offset-4 hover:text-indigo-500 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 ${darkMode ? 'text-white' : 'text-gray-800'}`} aria-label={`${i18n.language === 'fa' ? 'نمایش راهنمای واژه' : 'Open word guide'}: ${word.english_word}`}>{word.english_word}</button>
+                        <button type="button" onClick={() => { setVocabularyDictionary(null); setVocabularyDictionaryError(''); setVocabularyDictionaryLoading(true); setVocabularyRelatedWords({ synonyms: [], antonyms: [], collocations: [] }); setVocabularyExampleTranslations({}); setSelectedVocabularyWord(word); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className={`text-left text-2xl font-black tracking-tight underline-offset-4 hover:text-indigo-500 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 ${darkMode ? 'text-white' : 'text-gray-800'}`} aria-label={`${i18n.language === 'fa' ? 'نمایش راهنمای واژه' : 'Open word guide'}: ${word.english_word}`}>{word.english_word}</button>
                         <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-500'}`}>
                           {word.level || 'B1'}
                         </span>
