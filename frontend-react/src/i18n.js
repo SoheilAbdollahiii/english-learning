@@ -182,7 +182,7 @@ const resources = {
       writing_ai_invalid_key: "Your draft was saved, but Groq rejected the API key (401/403). Replace the placeholder or revoked key in the server environment, then restart the backend.",
       writing_ai_rate_limited: "Your draft was saved, but Groq rate-limited the request (429). Check your plan quota and retry after the limit resets.",
       writing_ai_model_error: "Your draft was saved, but Groq rejected the model or request (400). Verify GROQ_MODEL against the currently supported model IDs.",
-      writing_ai_network_error: "Your draft was saved, but the server could not reach Groq or timed out. Check outbound network access, DNS, and proxy settings."
+      writing_ai_network_error: "Your draft was saved, but the server could not reach Groq or timed out. Check outbound network access, DNS, and proxy settings.",
       ready_quiz: "Ready to test your knowledge?",
       quiz_intro: "Take a short quiz based on your learned vocabulary and skills, with detailed explanations.",
       loading: "Loading...",
