@@ -64,8 +64,10 @@ class CorrectWritingTests(SimpleTestCase):
     @override_settings(GROQ_API_KEY="test-key", GROQ_MODEL="test-model")
     def test_provider_errors_are_reported_as_unavailable(self, groq_cls, _retrieve):
         groq_cls.side_effect = RuntimeError("provider unavailable")
-        with self.assertRaises(CorrectionUnavailable):
-            correct_writing("I went home yesterday.")
+        with self.assertLogs("rag.services", level="ERROR") as logs:
+            with self.assertRaises(CorrectionUnavailable):
+                correct_writing("I went home yesterday.")
+        self.assertIn("Groq writing correction failed (model=test-model)", logs.output[0])
 
 
 
