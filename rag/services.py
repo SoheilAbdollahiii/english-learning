@@ -110,11 +110,16 @@ def correct_writing(text: str) -> dict:
         logger.exception("Groq writing correction failed (model=%s).", settings.GROQ_MODEL)
         status_code = getattr(exc, "status_code", None)
         exception_name = type(exc).__name__
-        if status_code in (401, 403) or "Authentication" in exception_name:
+        # Groq uses 401 for invalid credentials, but 403 commonly means the
+        # model is blocked by organization/project permissions. Do not tell
+        # users to rotate a valid key when the actual fix is a permission.
+        if status_code == 401 or "Authentication" in exception_name:
             error_code = "invalid_api_key"
+        elif status_code == 403:
+            error_code = "model_permission_denied"
         elif status_code == 429 or "RateLimit" in exception_name:
             error_code = "rate_limited"
-        elif status_code == 400 or "BadRequest" in exception_name:
+        elif status_code in (400, 422) or "BadRequest" in exception_name:
             error_code = "invalid_model_or_request"
         elif any(token in exception_name for token in ("Connection", "Timeout", "Network")):
             error_code = "network_error"
