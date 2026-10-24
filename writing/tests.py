@@ -136,6 +136,18 @@ class WritingAPIPermissionsTests(TestCase):
         self.assertEqual([entry["id"] for entry in response.data], [own.id])
         self.assertEqual(response.data[0]["original_text"], "My entry")
 
+    def test_delete_removes_only_authenticated_users_writings(self):
+        WritingSubmission.objects.create(user=self.user, original_text="My entry")
+        other_entry = WritingSubmission.objects.create(user=self.other_user, original_text="Private entry")
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.delete(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["deleted_count"], 1)
+        self.assertFalse(WritingSubmission.objects.filter(user=self.user).exists())
+        self.assertTrue(WritingSubmission.objects.filter(pk=other_entry.pk).exists())
+
     def test_post_assigns_owner_server_side_and_ignores_client_score(self):
         self.client.force_authenticate(user=self.user)
         response = self.client.post(
