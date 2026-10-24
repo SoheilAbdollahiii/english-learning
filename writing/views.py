@@ -38,11 +38,11 @@ def _analyze_or_save_draft(text):
     try:
         analysis = correct_writing(text)
         return {**analysis, "ai_status": "corrected", "ai_error_code": None}
-    except CorrectionUnavailable:
+    except CorrectionUnavailable as exc:
         configured_key = (settings.GROQ_API_KEY or "").strip()
         placeholder_keys = {"your-groq-api-key", "your_groq_api_key", "replace-with-your-groq-api-key"}
         missing_key = not configured_key or configured_key.lower() in placeholder_keys
-        error_code = "missing_api_key" if missing_key else "provider_error"
+        error_code = "missing_api_key" if missing_key else getattr(exc, "code", "provider_error")
         return {
             "corrected_text": "",
             "feedback": (
