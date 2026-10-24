@@ -8,6 +8,7 @@ urlpatterns = [
     path("api/submit/", views.submit_quiz, name="quiz_submit"),
     path("api/check-answer/", views.check_quiz_answer, name="quiz_check_answer"),
     path("api/history/", views.quiz_history, name="quiz_history"),
+    path("api/mistakes/", views.quiz_mistakes, name="quiz_mistakes"),
     path("api/analysis/", views.quiz_performance_analysis, name="quiz_performance_analysis"),
     path("api/analysis/<int:session_id>/", views.quiz_performance_analysis, name="quiz_performance_analysis_detail"),
     path("api/stats/", views.quiz_stats, name="quiz_stats"),
