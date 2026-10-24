@@ -935,7 +935,7 @@ export default function App() {
       const exactDefinition = definitions.status === 'fulfilled'
         ? definitions.value.find((item) => item.word?.toLowerCase() === word && Array.isArray(item.defs))
         : null
-      if (!dictionaryEntry && exactDefinition?.defs?.length) {
+      if (!dictionaryEntry?.meanings?.length && exactDefinition?.defs?.length) {
         const grouped = new Map()
         exactDefinition.defs.forEach((item) => {
           const [partOfSpeech, ...definitionParts] = String(item).split('\t')
