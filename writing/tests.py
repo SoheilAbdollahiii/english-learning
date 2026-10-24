@@ -5,6 +5,7 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 
 from .models import WritingSubmission
+from rag.services import CorrectionUnavailable
 
 
 User = get_user_model()
@@ -181,3 +182,32 @@ class WritingAPIPermissionsTests(TestCase):
         self.assertEqual(blank.status_code, 400)
         self.assertEqual(long_text.status_code, 400)
         self.assertEqual(WritingSubmission.objects.count(), 0)
+
+
+    @override_settings(GROQ_API_KEY="your-groq-api-key")
+    def test_api_reports_placeholder_groq_key_as_configuration_error(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            self.url,
+            {"original_text": "I am learning English."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["ai_status"], "unavailable")
+        self.assertEqual(response.data["ai_error_code"], "missing_api_key")
+        self.assertIsNone(response.data["score"])
+        self.assertEqual(response.data["corrected_text"], "")
+
+    @patch("writing.views.correct_writing", side_effect=CorrectionUnavailable("provider unavailable"))
+    @override_settings(GROQ_API_KEY="configured-test-key")
+    def test_api_reports_provider_failure_separately_from_missing_key(self, _correct):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            self.url,
+            {"original_text": "I am learning English."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["ai_status"], "unavailable")
+        self.assertEqual(response.data["ai_error_code"], "provider_error")
+        self.assertIn("provider request failed", response.data["feedback"])
