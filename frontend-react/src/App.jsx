@@ -954,13 +954,15 @@ export default function App() {
           }
         }
       }
+      const followingWords = followers.status === 'fulfilled' ? followers.value.map((item) => item.word).filter(Boolean) : []
+      const precedingWords = predecessors.status === 'fulfilled' ? predecessors.value.map((item) => item.word).filter(Boolean) : []
       const related = {
         synonyms: synonyms.status === 'fulfilled' ? synonyms.value.map((item) => item.word).filter(Boolean).slice(0, 8) : [],
         antonyms: antonyms.status === 'fulfilled' ? antonyms.value.map((item) => item.word).filter(Boolean).slice(0, 8) : [],
         collocations: [...new Set([
-          ...(followers.status === 'fulfilled' ? followers.value.map((item) => item.word) : []),
-          ...(predecessors.status === 'fulfilled' ? predecessors.value.map((item) => item.word) : []),
-        ].filter(Boolean))].slice(0, 10),
+          ...followingWords.map((item) => `${word} ${item}`),
+          ...precedingWords.map((item) => `${item} ${word}`),
+        ])].slice(0, 10),
       }
       if (dictionaryEntry?.meanings?.length) {
         dictionaryEntry.meanings = dictionaryEntry.meanings.map((meaning) => ({
@@ -992,18 +994,18 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false
-    const examples = (vocabularyDictionary?.meanings || [])
+    const dictionaryText = (vocabularyDictionary?.meanings || [])
       .flatMap((meaning) => meaning.definitions || [])
-      .map((definition) => definition.example)
-      .filter((example, index, all) => example && all.indexOf(example) === index)
-      .slice(0, 8)
+      .flatMap((definition) => [definition.definition, definition.example])
+      .filter((text, index, all) => text && all.indexOf(text) === index)
+      .slice(0, 14)
     setVocabularyExampleTranslations({})
-    if (i18n.language !== 'fa' || examples.length === 0) return undefined
-    const translateExamples = async () => {
-      const translations = await Promise.all(examples.map(async (example) => [example, await translateEnglishToPersian(example)]))
+    if (i18n.language !== 'fa' || dictionaryText.length === 0) return undefined
+    const translateDictionaryText = async () => {
+      const translations = await Promise.all(dictionaryText.map(async (text) => [text, await translateEnglishToPersian(text)]))
       if (!cancelled) setVocabularyExampleTranslations(Object.fromEntries(translations.filter(([, translation]) => translation)))
     }
-    translateExamples()
+    translateDictionaryText()
     return () => { cancelled = true }
   }, [vocabularyDictionary, i18n.language])
 
@@ -1564,6 +1566,7 @@ export default function App() {
                             {(meaning.definitions || []).map((definition, definitionIndex) => (
                               <li key={definitionIndex}>
                                 <p>{definition.definition}</p>
+                                {i18n.language === 'fa' && vocabularyExampleTranslations[definition.definition] && <p className="mt-1 text-sm text-indigo-500" dir="rtl">{vocabularyExampleTranslations[definition.definition]}</p>}
                                 {definition.example && <p className="mt-1 text-sm text-gray-500">{definition.example}</p>}
                                 {definition.example && vocabularyExampleTranslations[definition.example] && <p className="text-sm text-indigo-500" dir="rtl">{vocabularyExampleTranslations[definition.example]}</p>}
                               </li>
