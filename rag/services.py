@@ -1,10 +1,13 @@
 """LLM-assisted English writing feedback grounded in retrieved grammar documents."""
 import json
+import logging
 
 from django.conf import settings
 from groq import Groq
 
 from .knowledge_base import retrieve_grammar_rule
+
+logger = logging.getLogger(__name__)
 
 
 class CorrectionUnavailable(RuntimeError):
@@ -15,6 +18,7 @@ def correct_writing(text: str) -> dict:
     """Return corrected writing, actionable feedback, a score, and RAG context."""
     api_key = settings.GROQ_API_KEY
     if not api_key:
+        logger.error("AI writing correction unavailable: GROQ_API_KEY is not configured.")
         raise CorrectionUnavailable("GROQ_API_KEY is not configured.")
 
     try:
@@ -65,6 +69,7 @@ def correct_writing(text: str) -> dict:
             "grammar_reference": rule,
         }
     except Exception as exc:
+        logger.exception("Groq writing correction failed (model=%s).", settings.GROQ_MODEL)
         raise CorrectionUnavailable(
             "The AI correction service is temporarily unavailable. Please try again."
         ) from exc
