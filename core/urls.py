@@ -21,4 +21,5 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('quiz/', include('quiz.urls')),
     path('learning/', include('personalization.urls')),
+    path('api/conversation/turn/', __import__('rag.views', fromlist=['conversation_turn']).conversation_turn, name='conversation_turn'),
 ]
