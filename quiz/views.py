@@ -441,7 +441,22 @@ def submit_quiz(request):
         total_questions=total,
         duration_seconds=duration_seconds,
         topic_breakdown={item["topic"]: item for item in analysis["topic_breakdown"]},
-        mistake_patterns=analysis["common_mistakes"],
+        mistake_patterns={
+            "common_mistakes": analysis["common_mistakes"],
+            "questions": [
+                {
+                    key: detail.get(key)
+                    for key in (
+                        "question_id", "quiz_type", "level", "difficulty", "topic",
+                        "question_text", "user_answer", "correct_answer", "is_correct",
+                        "correct_answer_text", "explanation", "example_sentence",
+                        "example_translation", "common_mistake",
+                    )
+                }
+                for detail in details
+                if not detail.get("is_correct")
+            ],
+        },
     )
     analysis["session_id"] = session.id
     return Response({
@@ -456,6 +471,31 @@ def submit_quiz(request):
         "message": "Quiz submitted successfully!",
     }, status=status.HTTP_201_CREATED)
 
+
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def quiz_mistakes(request):
+    """Return this learner's incorrectly answered quiz questions for review."""
+    sessions = QuizSession.objects.filter(user=request.user).order_by("-created_at")
+    results = []
+    for session in sessions:
+        stored = session.mistake_patterns
+        if not isinstance(stored, dict):
+            continue
+        questions = stored.get("questions", [])
+        if not isinstance(questions, list):
+            continue
+        for mistake in questions:
+            if not isinstance(mistake, dict) or not mistake.get("question_id"):
+                continue
+            results.append({
+                **mistake,
+                "session_id": session.id,
+                "created_at": session.created_at,
+            })
+    return Response(results)
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
