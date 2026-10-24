@@ -160,6 +160,12 @@ class WritingAPIPermissionsTests(TestCase):
         "corrected_text": "She goes to school every day.",
         "feedback": "Use the third-person singular form 'goes'.",
         "score": 87,
+        "mistakes": [{
+            "original": "She go",
+            "correction": "She goes",
+            "explanation": "Use -s with he/she/it in the present simple.",
+            "category": "grammar",
+        }],
         "grammar_reference": "Subject-verb agreement",
     })
     @override_settings(GROQ_API_KEY="test-key")
@@ -174,6 +180,9 @@ class WritingAPIPermissionsTests(TestCase):
         self.assertEqual(response.data["corrected_text"], "She goes to school every day.")
         self.assertEqual(response.data["feedback"], "Use the third-person singular form 'goes'.")
         self.assertEqual(response.data["score"], 87)
+        self.assertEqual(response.data["mistakes"][0]["category"], "grammar")
+        self.assertEqual(response.data["mistakes"][0]["original"], "She go")
+        self.assertEqual(WritingSubmission.objects.get().mistakes[0]["correction"], "She goes")
 
     def test_api_rejects_blank_and_overlong_text(self):
         self.client.force_authenticate(user=self.user)
