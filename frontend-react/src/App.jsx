@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts'
 
 import { apiFetch, apiUrl } from './api'
-import ConversationLab from './ConversationLab'
+import MistakeNotebook from './MistakeNotebook'
 
 const THEMATIC_VOCABULARY_SETS = [
   {
@@ -1829,7 +1829,10 @@ export default function App() {
         const newSubmission = await res.json();
         setWritings([newSubmission, ...writings]);
         setWritingText('');
-        alert(newSubmission.corrected_text ? t('writing_analyzed') : t('writing_saved'));
+        if (newSubmission.ai_status === 'corrected' && newSubmission.corrected_text) alert(t('writing_analyzed'));
+        else if (newSubmission.ai_error_code === 'missing_api_key') alert(t('writing_ai_missing_key'));
+        else if (newSubmission.ai_status === 'unavailable') alert(t('writing_ai_provider_error'));
+        else alert(t('writing_saved'));
       } else {
         alert(t('writing_failed'));
       }
@@ -2586,7 +2589,7 @@ export default function App() {
               </div>
             )}
 
-            {activeTab === 'conversation' && <ConversationLab darkMode={darkMode} onStartWordReview={(word) => { changeTab('vocabulary'); startWordReview(word) }} />}
+            {activeTab === 'conversation' && <MistakeNotebook darkMode={darkMode} />}
 
             {activeTab === 'quiz' && (
               <div className="max-w-2xl mx-auto space-y-6">
