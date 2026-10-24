@@ -17,9 +17,10 @@ class CorrectionUnavailable(RuntimeError):
 def correct_writing(text: str) -> dict:
     """Return corrected writing, actionable feedback, a score, and RAG context."""
     api_key = settings.GROQ_API_KEY
-    if not api_key:
-        logger.error("AI writing correction unavailable: GROQ_API_KEY is not configured.")
-        raise CorrectionUnavailable("GROQ_API_KEY is not configured.")
+    placeholder_keys = {"your-groq-api-key", "your_groq_api_key", "replace-with-your-groq-api-key"}
+    if not api_key or api_key.strip().lower() in placeholder_keys:
+        logger.error("AI writing correction unavailable: GROQ_API_KEY is missing or still contains a placeholder.")
+        raise CorrectionUnavailable("GROQ_API_KEY is not configured with a real API key.")
 
     try:
         rule = retrieve_grammar_rule(text)
