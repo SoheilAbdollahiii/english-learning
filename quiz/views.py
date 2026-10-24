@@ -445,13 +445,22 @@ def submit_quiz(request):
             "common_mistakes": analysis["common_mistakes"],
             "questions": [
                 {
-                    key: detail.get(key)
-                    for key in (
-                        "question_id", "quiz_type", "level", "difficulty", "topic",
-                        "question_text", "user_answer", "correct_answer", "is_correct",
-                        "correct_answer_text", "explanation", "example_sentence",
-                        "example_translation", "common_mistake",
-                    )
+                    **{
+                        key: detail.get(key)
+                        for key in (
+                            "question_id", "quiz_type", "level", "difficulty", "topic",
+                            "question_text", "user_answer", "correct_answer", "is_correct",
+                            "correct_answer_text", "explanation", "example_sentence",
+                            "example_translation", "common_mistake",
+                        )
+                    },
+                    "user_answer_text": next(
+                        (
+                            getattr(questions[detail["question_id"]], "option_" + str(detail.get("user_answer", "")).lower(), "")
+                            for _ in (0,)
+                        ),
+                        "",
+                    ),
                 }
                 for detail in details
                 if not detail.get("is_correct")
