@@ -1648,7 +1648,14 @@ export default function App() {
   };
 
   const dailyWordsAdded = personalWords.filter((word) => new Date(word.created_at).toDateString() === new Date().toDateString()).length
-  const dailyGoalPercent = Math.min(100, Math.round((dailyWordsAdded / Math.max(1, Number(preferences.daily_word_goal) || 1)) * 100))
+  const dailyLearningSeconds = quizHistory.reduce((total, session) => {
+    const createdAt = session.created_at ? new Date(session.created_at) : null
+    if (!createdAt || Number.isNaN(createdAt.getTime()) || createdAt.toDateString() !== new Date().toDateString()) return total
+    return total + Math.max(0, Number(session.duration_seconds) || 0)
+  }, 0)
+  const dailyLearningMinutes = Math.floor(dailyLearningSeconds / 60)
+  const dailyMinutesGoal = 15
+  const dailyGoalPercent = Math.min(100, Math.round((dailyLearningSeconds / (dailyMinutesGoal * 60)) * 100))
   const goalTab = ({ general: 'vocabulary', travel: 'reading', work: 'writing', exam: 'quiz' })[preferences.learning_goal] || 'vocabulary'
   const goalPromptKey = `writing_prompt_${preferences.learning_goal || 'general'}`
 
@@ -1931,6 +1938,14 @@ export default function App() {
           <>
             {activeTab === 'dashboard' && (
               <div className="space-y-8">
+                <section className={`rounded-2xl border p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${darkMode ? 'bg-indigo-950/40 border-indigo-900' : 'bg-indigo-50 border-indigo-100'}`}>
+                  <div>
+                    <p className={`text-sm font-bold ${darkMode ? 'text-indigo-300' : 'text-indigo-700'}`}>{t('daily_learning_goal')}</p>
+                    <h2 className={`text-2xl font-black mt-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t('daily_learning_headline')}</h2>
+                    <p className={`text-sm mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('daily_learning_subtitle', { minutes: dailyMinutesGoal })}</p>
+                  </div>
+                  <button onClick={() => changeTab(goalTab)} className="shrink-0 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-3 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2">{t('continue_learning')} →</button>
+                </section>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
                   <div className={`p-6 rounded-2xl shadow-sm border flex flex-col justify-center items-center transition-shadow ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                     <h3 className="text-gray-400 font-bold mb-2">{t('vocab_title')}</h3>
@@ -1946,11 +1961,11 @@ export default function App() {
                   </div>
                   <div className={`p-6 rounded-2xl shadow-sm border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                     <h3 className="text-gray-400 font-bold mb-3">{t('daily_goal_progress')}</h3>
-                    <p className="text-2xl font-black text-indigo-500">{dailyWordsAdded} / {preferences.daily_word_goal}</p>
-                    <div className={`w-full rounded-full h-2.5 mt-4 overflow-hidden ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                    <div className="flex items-baseline gap-1"><p className="text-2xl font-black text-indigo-500">{dailyLearningMinutes}</p><span className="text-sm text-gray-500">/ {dailyMinutesGoal} {t('minutes_short')}</span></div>
+                    <div className={`w-full rounded-full h-2.5 mt-4 overflow-hidden ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`} role="progressbar" aria-label={t('daily_goal_progress')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={dailyGoalPercent}>
                       <div className="bg-indigo-600 h-2.5 rounded-full transition-all" style={{ width: `${dailyGoalPercent}%` }}></div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">{t('words_added_today')}</p>
+                    <p className="text-xs text-gray-500 mt-2">{t('daily_goal_quiz_time_note')} · {dailyGoalPercent}%</p>
                   </div>
                 </div>
 
