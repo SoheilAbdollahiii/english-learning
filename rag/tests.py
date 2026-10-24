@@ -65,3 +65,56 @@ class CorrectWritingTests(SimpleTestCase):
         groq_cls.side_effect = RuntimeError("provider unavailable")
         with self.assertRaises(CorrectionUnavailable):
             correct_writing("I went home yesterday.")
+
+
+
+class ConversationServiceTests(SimpleTestCase):
+    def test_rejects_invalid_level_and_scenario(self):
+        from .conversation import continue_conversation
+        with self.assertRaises(ValueError):
+            continue_conversation("C2", "daily", [{"role": "user", "content": "Hello"}])
+        with self.assertRaises(ValueError):
+            continue_conversation("B1", "unsupported", [{"role": "user", "content": "Hello"}])
+
+    def test_rejects_empty_or_oversized_conversation(self):
+        from .conversation import continue_conversation
+        with self.assertRaises(ValueError):
+            continue_conversation("A1", "daily", [])
+        with self.assertRaises(ValueError):
+            continue_conversation("A1", "daily", [{"role": "user", "content": "x" * 1201}])
+
+    @patch("rag.conversation.Groq")
+    @override_settings(GROQ_API_KEY="test-key", GROQ_MODEL="test-model")
+    def test_returns_roleplay_reply_correction_and_useful_phrases(self, groq_cls):
+        from .conversation import continue_conversation
+        message = MagicMock()
+        message.content = json.dumps({
+            "reply": "Of course. Would you like a drink with that?",
+            "corrected_text": "I would like a coffee, please.",
+            "feedback": "Use 'would like' to make a polite request.",
+            "useful_phrases": [{"phrase": "Would you like...?", "meaning": "آیا میل دارید؟"}],
+        })
+        groq_cls.return_value.chat.completions.create.return_value.choices = [MagicMock(message=message)]
+        result = continue_conversation("A1", "restaurant", [{"role": "user", "content": "I want coffee."}])
+        self.assertEqual(result["reply"], "Of course. Would you like a drink with that?")
+        self.assertEqual(result["corrected_text"], "I would like a coffee, please.")
+        self.assertEqual(result["useful_phrases"][0]["phrase"], "Would you like...?")
+        request = groq_cls.return_value.chat.completions.create.call_args.kwargs
+        self.assertIn("CEFR level is A1", request["messages"][0]["content"])
+        self.assertEqual(request["model"], "test-model")
+
+    @override_settings(GROQ_API_KEY="")
+    def test_requires_configured_provider(self):
+        from .conversation import ConversationUnavailable, continue_conversation
+        with self.assertRaises(ConversationUnavailable):
+            continue_conversation("B1", "daily", [{"role": "user", "content": "Hi there."}])
+
+    @patch("rag.conversation.Groq")
+    @override_settings(GROQ_API_KEY="test-key", GROQ_MODEL="test-model")
+    def test_rejects_malformed_provider_response(self, groq_cls):
+        from .conversation import ConversationUnavailable, continue_conversation
+        message = MagicMock()
+        message.content = '{"reply": ""}'
+        groq_cls.return_value.chat.completions.create.return_value.choices = [MagicMock(message=message)]
+        with self.assertRaises(ConversationUnavailable):
+            continue_conversation("B1", "daily", [{"role": "user", "content": "Hi there."}])
