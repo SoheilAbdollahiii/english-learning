@@ -12,6 +12,7 @@ const CATEGORY_LABELS = {
   style: { en: 'Style', fa: 'سبک نگارش' },
   other: { en: 'Other', fa: 'سایر' },
   vocabulary: { en: 'My vocabulary', fa: 'واژگان من' },
+  reading: { en: 'Reading', fa: 'درک مطلب' },
 }
 
 function readSavedIds() {
