@@ -74,7 +74,7 @@ Run `python manage.py migrate` after pulling the changes so the personal data ta
    python manage.py runserver
    ```
 
-Without a real `GROQ_API_KEY`, the site still saves drafts but reports that automated correction is unavailable. Do not leave the `.env.example` placeholder (`your-groq-api-key`) in your local `.env`. The writing API returns an `ai_error_code` (`missing_api_key`, `invalid_api_key`, `rate_limited`, `invalid_model_or_request`, `network_error`, or `provider_error`) so the React UI can give a targeted next step. Provider failures are logged by the Django `rag.services` logger; check server logs for the underlying error without exposing credentials.
+Without a real `GROQ_API_KEY`, the site still saves drafts but reports that automated correction is unavailable. Do not leave the `.env.example` placeholder (`your-groq-api-key`) in your local `.env`. The writing API returns an `ai_error_code` (`missing_api_key`, `invalid_api_key`, `model_permission_denied`, `rate_limited`, `invalid_model_or_request`, `network_error`, or `provider_error`) so the React UI can give a targeted next step. A Groq `403` is treated separately from an invalid key because it can mean the model is blocked by organization or project permissions; check [Groq model permissions](https://console.groq.com/docs/model-permissions) before rotating a valid key. Provider failures are logged by the Django `rag.services` logger; check server logs for the underlying error without exposing credentials.
 
 ## Run the React frontend
 
