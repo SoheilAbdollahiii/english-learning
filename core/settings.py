@@ -150,7 +150,7 @@ SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 X_FRAME_OPTIONS = "DENY"
 
 REST_FRAMEWORK = {
-    "DEFAULT_THROTTLE_RATES": {"registration": "5/hour", "login": "20/hour", "writing_correction": "30/day"},
+    "DEFAULT_THROTTLE_RATES": {"registration": "5/hour", "login": "20/hour", "writing_correction": "30/day", "conversation": "60/day"},
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
