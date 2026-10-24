@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import TemplateView
 from core import views
+from rag.views import conversation_turn
 from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
@@ -21,5 +22,5 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('quiz/', include('quiz.urls')),
     path('learning/', include('personalization.urls')),
-    path('api/conversation/turn/', __import__('rag.views', fromlist=['conversation_turn']).conversation_turn, name='conversation_turn'),
+    path('api/conversation/turn/', conversation_turn, name='conversation_turn'),
 ]
