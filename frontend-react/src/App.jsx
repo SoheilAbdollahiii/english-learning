@@ -1655,6 +1655,11 @@ export default function App() {
   const dailyLearningMinutes = Math.floor(dailyLearningSeconds / 60)
   const dailyMinutesGoal = 15
   const dailyGoalPercent = Math.min(100, Math.round((dailyLearningSeconds / (dailyMinutesGoal * 60)) * 100))
+  const estimatedReviewMinutes = Math.ceil(dueReviewCount * 0.5)
+  const difficultReviewWords = [...personalWords]
+    .filter((word) => Number(word.incorrect_count) > 0)
+    .sort((left, right) => (Number(right.incorrect_count) - Number(left.incorrect_count)) || (Number(left.proficiency) - Number(right.proficiency)))
+    .slice(0, 3)
   const goalTab = ({ general: 'vocabulary', travel: 'reading', work: 'writing', exam: 'quiz' })[preferences.learning_goal] || 'vocabulary'
   const goalPromptKey = `writing_prompt_${preferences.learning_goal || 'general'}`
 
@@ -1990,13 +1995,44 @@ export default function App() {
                   )}
                 </section>
 
-                <div className={`p-5 rounded-2xl border flex flex-wrap items-center justify-between gap-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-                  <div>
-                    <h3 className="text-lg font-extrabold">{t('spaced_review')}</h3>
-                    <p className={`text-sm mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('due_count', { count: dueReviewCount })}</p>
+                <section aria-labelledby="today-review-title" className={`p-5 md:p-6 rounded-2xl border space-y-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <h3 id="today-review-title" className="text-lg font-extrabold">{t('spaced_review')}</h3>
+                      <p className={`text-sm mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{t('due_count', { count: dueReviewCount })}</p>
+                      <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('estimated_review_time', { minutes: estimatedReviewMinutes })}</p>
+                    </div>
+                    <button type="button" onClick={() => changeTab('vocabulary')} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2">{t('open_review')}</button>
                   </div>
-                  <button type="button" onClick={() => changeTab('vocabulary')} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2">{t('open_review')}</button>
-                </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className={`rounded-xl p-4 ${darkMode ? 'bg-gray-900/60' : 'bg-indigo-50/70'}`}>
+                      <p className="text-sm font-bold">{t('difficult_words')}</p>
+                      {difficultReviewWords.length ? (
+                        <ul className="mt-2 space-y-2">
+                          {difficultReviewWords.map((word) => (
+                            <li key={word.id} className="flex items-center justify-between gap-3 text-sm">
+                              <span dir="ltr" className="font-semibold truncate">{word.english_word}</span>
+                              <span className="shrink-0 text-rose-500">{t('mistake_count', { count: word.incorrect_count })}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : <p className={`mt-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('no_difficult_words')}</p>}
+                    </div>
+                    <div className={`rounded-xl p-4 ${darkMode ? 'bg-gray-900/60' : 'bg-amber-50/70'}`}>
+                      <p className="text-sm font-bold">{t('most_missed_words')}</p>
+                      {difficultReviewWords.length ? (
+                        <ul className="mt-2 space-y-2">
+                          {difficultReviewWords.map((word) => (
+                            <li key={word.id} className="flex items-center justify-between gap-3 text-sm">
+                              <span dir="ltr" className="font-semibold truncate">{word.english_word}</span>
+                              <span className="shrink-0 text-rose-500">{Number(word.incorrect_count) || 0}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : <p className={`mt-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('no_missed_words')}</p>}
+                    </div>
+                  </div>
+                </section>
 
                 <div className={`p-5 rounded-2xl border flex flex-wrap items-center justify-between gap-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                   <div className="max-w-3xl">
