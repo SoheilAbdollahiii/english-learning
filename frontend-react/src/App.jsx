@@ -1830,8 +1830,16 @@ export default function App() {
         setWritings([newSubmission, ...writings]);
         setWritingText('');
         if (newSubmission.ai_status === 'corrected' && newSubmission.corrected_text) alert(t('writing_analyzed'));
-        else if (newSubmission.ai_error_code === 'missing_api_key') alert(t('writing_ai_missing_key'));
-        else if (newSubmission.ai_status === 'unavailable') alert(t('writing_ai_provider_error'));
+        else if (newSubmission.ai_status === 'unavailable') {
+          const errorMessageKey = ({
+            missing_api_key: 'writing_ai_missing_key',
+            invalid_api_key: 'writing_ai_invalid_key',
+            rate_limited: 'writing_ai_rate_limited',
+            invalid_model_or_request: 'writing_ai_model_error',
+            network_error: 'writing_ai_network_error',
+          })[newSubmission.ai_error_code] || 'writing_ai_provider_error';
+          alert(t(errorMessageKey));
+        }
         else alert(t('writing_saved'));
       } else {
         alert(t('writing_failed'));
