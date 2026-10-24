@@ -2586,7 +2586,7 @@ export default function App() {
               </div>
             )}
 
-            {activeTab === 'conversation' && <ConversationLab darkMode={darkMode} onStartWordReview={startWordReview} />}
+            {activeTab === 'conversation' && <ConversationLab darkMode={darkMode} onStartWordReview={(word) => { changeTab('vocabulary'); startWordReview(word) }} />}
 
             {activeTab === 'quiz' && (
               <div className="max-w-2xl mx-auto space-y-6">
