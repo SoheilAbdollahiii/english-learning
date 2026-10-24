@@ -49,6 +49,7 @@ export default function App() {
   const [vocabularyDictionary, setVocabularyDictionary] = useState(null)
   const [vocabularyDictionaryLoading, setVocabularyDictionaryLoading] = useState(false)
   const [vocabularyDictionaryError, setVocabularyDictionaryError] = useState('')
+  const [vocabularyExampleTranslations, setVocabularyExampleTranslations] = useState({})
   const [loading, setLoading] = useState(() => !!localStorage.getItem('access_token'))
   
   const [writingText, setWritingText] = useState('')
@@ -917,6 +918,23 @@ export default function App() {
     return () => { cancelled = true }
   }, [selectedVocabularyWord?.english_word, i18n.language])
 
+  useEffect(() => {
+    let cancelled = false
+    const examples = (vocabularyDictionary?.meanings || [])
+      .flatMap((meaning) => meaning.definitions || [])
+      .map((definition) => definition.example)
+      .filter((example, index, all) => example && all.indexOf(example) === index)
+      .slice(0, 8)
+    setVocabularyExampleTranslations({})
+    if (i18n.language !== 'fa' || examples.length === 0) return undefined
+    const translateExamples = async () => {
+      const translations = await Promise.all(examples.map(async (example) => [example, await translateEnglishToPersian(example)]))
+      if (!cancelled) setVocabularyExampleTranslations(Object.fromEntries(translations.filter(([, translation]) => translation)))
+    }
+    translateExamples()
+    return () => { cancelled = true }
+  }, [vocabularyDictionary, i18n.language])
+
   const speakVocabularyWord = (word) => {
     if (!word?.english_word || typeof window === 'undefined' || !('speechSynthesis' in window)) return
     window.speechSynthesis.cancel()
@@ -1475,7 +1493,7 @@ export default function App() {
                               <li key={definitionIndex}>
                                 <p>{definition.definition}</p>
                                 {definition.example && <p className="mt-1 text-sm text-gray-500">{definition.example}</p>}
-                                {definition.example && <p className="text-sm text-indigo-500">{i18n.language === 'fa' ? 'ترجمهٔ فارسی مثال با ترجمه‌گر در دسترس مرورگر قابل دریافت است.' : 'Example translation can be requested with the browser translation service.'}</p>}
+                                {definition.example && vocabularyExampleTranslations[definition.example] && <p className="text-sm text-indigo-500" dir="rtl">{vocabularyExampleTranslations[definition.example]}</p>}
                               </li>
                             ))}
                           </ul>
@@ -1492,7 +1510,18 @@ export default function App() {
                       {vocabularyDictionary?.meanings?.flatMap((meaning) => meaning.definitions || []).find((definition) => definition.example)?.example && (
                         <p className="mt-2" dir="ltr">{vocabularyDictionary.meanings.flatMap((meaning) => meaning.definitions || []).find((definition) => definition.example).example}</p>
                       )}
-                      <p className="mt-2 text-sm text-gray-500">{i18n.language === 'fa' ? 'ترکیب‌های رایج از داده‌های فرهنگ لغت، در صورت ارائه، در بخش مترادف‌ها و تعریف‌ها نمایش داده می‌شوند.' : 'Dictionary-provided synonyms and definitions above can help you learn common usage; collocations are not always supplied by the source.'}</p>
+                      <h4 className="mt-4 font-bold">{i18n.language === 'fa' ? 'مترادف‌ها و متضادها' : 'Synonyms and antonyms'}</h4>
+                      {(vocabularyDictionary?.meanings || []).some((meaning) => meaning.synonyms?.length || meaning.antonyms?.length) ? (
+                        <div className="mt-2 space-y-2">
+                          {(vocabularyDictionary?.meanings || []).map((meaning, index) => (
+                            <div key={`relations-${index}`} className="text-sm">
+                              {meaning.synonyms?.length > 0 && <p><strong>{i18n.language === 'fa' ? 'مترادف‌ها:' : 'Synonyms:'}</strong> {meaning.synonyms.join(', ')}</p>}
+                              {meaning.antonyms?.length > 0 && <p><strong>{i18n.language === 'fa' ? 'متضادها:' : 'Antonyms:'}</strong> {meaning.antonyms.join(', ')}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      ) : <p className="mt-1 text-sm text-gray-500">{i18n.language === 'fa' ? 'برای این واژه، فرهنگ لغت منبع مترادف یا متضاد ثبت نکرده است.' : 'The dictionary source did not provide synonyms or antonyms for this entry.'}</p>}
+                      <p className="mt-2 text-sm text-gray-500">{i18n.language === 'fa' ? 'ترکیب‌های رایج ممکن است در ورودی فرهنگ لغت موجود نباشند؛ مثال‌ها کاربرد واژه را در جمله نشان می‌دهند.' : 'The dictionary source does not consistently provide collocations; example sentences illustrate real usage.'}</p>
                     </div>
                   </section>
                 )}
