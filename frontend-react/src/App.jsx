@@ -9,7 +9,7 @@ const THEMATIC_VOCABULARY_SETS = [
     id: 'daily', icon: '💬', title: { en: 'Everyday conversations', fa: 'مکالمات روزمره و اصطلاحات طبیعی' },
     description: { en: 'Sound natural in small talk and daily interactions.', fa: 'برای گفت‌وگوهای کوتاه و تعامل‌های روزانه طبیعی‌تر صحبت کن.' },
     words: [
-      ['actually','در واقع','A2'], ['by the way','راستی','A2'], ['sounds good','خوبه، موافقم','A2'], ['no worries','اشکالی نداره','A2'],
+      ['actually','در واقع','B1'], ['by the way','راستی','A1'], ['sounds good','خوبه، موافقم','A1'], ['no worries','اشکالی نداره','A1'],
       ['hang out','وقت گذراندن با دوستان','B1'], ['figure out','فهمیدن، راه‌حل پیدا کردن','B1'], ['catch up','از حال هم باخبر شدن','B1'], ['make sense','منطقی بودن','B1'],
     ],
   },
@@ -18,31 +18,31 @@ const THEMATIC_VOCABULARY_SETS = [
     description: { en: 'Handle check-in, directions, bookings and travel problems.', fa: 'از پذیرش و مسیر پرسیدن تا رزرو و مشکلات سفر را مدیریت کن.' },
     words: [
       ['boarding pass','کارت پرواز','A1'], ['departure','حرکت، زمان پرواز','A1'], ['arrival','ورود','A1'], ['luggage','بار و چمدان','A1'],
-      ['reservation','رزرو','A2'], ['check in','پذیرش شدن','A2'], ['delayed','با تأخیر','A2'], ['aisle seat','صندلی کنار راهرو','B1'],
+      ['reservation','رزرو','A1'], ['check in','پذیرش شدن','A1'], ['delayed','با تأخیر','B1'], ['aisle seat','صندلی کنار راهرو','B1'],
     ],
   },
   {
     id: 'work', icon: '💼', title: { en: 'Work, meetings & interviews', fa: 'کار، جلسات و مصاحبه' },
     description: { en: 'Use clear, professional English with colleagues and recruiters.', fa: 'در محیط کار، جلسه‌ها و مصاحبه‌ها حرفه‌ای و روشن صحبت کن.' },
     words: [
-      ['deadline','مهلت نهایی','A2'], ['colleague','همکار','A2'], ['agenda','دستور جلسه','B1'], ['feedback','بازخورد','B1'],
-      ['follow up','پیگیری کردن','B1'], ['come up with','ارائه دادن، به ذهن رسیدن','B1'], ['negotiate','مذاکره کردن','B2'], ['strengths','نقاط قوت','B1'],
+      ['deadline','مهلت نهایی','B1'], ['colleague','همکار','B1'], ['agenda','دستور جلسه','B1'], ['feedback','بازخورد','B1'],
+      ['follow up','پیگیری کردن','B1'], ['come up with','ارائه دادن، به ذهن رسیدن','B1'], ['negotiate','مذاکره کردن','C1'], ['strengths','نقاط قوت','B1'],
     ],
   },
   {
     id: 'academic', icon: '🎓', title: { en: 'University & language exams', fa: 'دانشگاه و آزمون‌های زبان' },
     description: { en: 'Build vocabulary for lectures, essays, research and exams.', fa: 'واژگان کاربردی برای کلاس، مقاله، پژوهش و آزمون‌ها یاد بگیر.' },
     words: [
-      ['assignment','تکلیف','A2'], ['lecture','سخنرانی، کلاس دانشگاه','A2'], ['research','پژوهش','B1'], ['evidence','مدرک، شواهد','B1'],
-      ['analyse','تحلیل کردن','B1'], ['significant','قابل‌توجه، مهم','B2'], ['hypothesis','فرضیه','C1'], ['evaluate','ارزیابی کردن','B2'],
+      ['assignment','تکلیف','B1'], ['lecture','سخنرانی، کلاس دانشگاه','B1'], ['research','پژوهش','B1'], ['evidence','مدرک، شواهد','B1'],
+      ['analyse','تحلیل کردن','B1'], ['significant','قابل‌توجه، مهم','C1'], ['hypothesis','فرضیه','C1'], ['evaluate','ارزیابی کردن','C1'],
     ],
   },
   {
     id: 'phrasal', icon: '🧩', title: { en: 'Phrasal verbs & collocations', fa: 'افعال عبارتی و ترکیب‌های رایج' },
     description: { en: 'Learn useful word combinations instead of isolated words.', fa: 'به‌جای حفظ واژه‌های جدا، ترکیب‌های طبیعی و پرکاربرد یاد بگیر.' },
     words: [
-      ['give up','تسلیم شدن، دست کشیدن','A2'], ['look after','مراقبت کردن از','A2'], ['put off','به تعویق انداختن','B1'], ['run out of','تمام کردن، تمام شدنِ','B1'],
-      ['take responsibility','مسئولیت پذیرفتن','B1'], ['pay attention','توجه کردن','A2'], ['reach a decision','به تصمیم رسیدن','B2'], ['highly unlikely','بسیار بعید','C1'],
+      ['give up','تسلیم شدن، دست کشیدن','A1'], ['look after','مراقبت کردن از','A1'], ['put off','به تعویق انداختن','B1'], ['run out of','تمام کردن، تمام شدنِ','B1'],
+      ['take responsibility','مسئولیت پذیرفتن','B1'], ['pay attention','توجه کردن','A1'], ['reach a decision','به تصمیم رسیدن','C1'], ['highly unlikely','بسیار بعید','C1'],
     ],
   },
 ]
