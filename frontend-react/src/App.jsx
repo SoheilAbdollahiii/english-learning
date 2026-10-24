@@ -1834,6 +1834,7 @@ export default function App() {
           const errorMessageKey = ({
             missing_api_key: 'writing_ai_missing_key',
             invalid_api_key: 'writing_ai_invalid_key',
+            model_permission_denied: 'writing_ai_model_permission_denied',
             rate_limited: 'writing_ai_rate_limited',
             invalid_model_or_request: 'writing_ai_model_error',
             network_error: 'writing_ai_network_error',
