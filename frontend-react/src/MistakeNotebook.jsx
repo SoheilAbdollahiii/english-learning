@@ -41,7 +41,10 @@ export default function MistakeNotebook({ darkMode }) {
     }
   }, [isPersian])
 
-  useEffect(() => { loadWritings() }, [loadWritings])
+  useEffect(() => {
+    const task = window.setTimeout(() => { loadWritings() }, 0)
+    return () => window.clearTimeout(task)
+  }, [loadWritings])
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(savedIds)) } catch { /* Storage may be unavailable in private browsing. */ }
   }, [savedIds])
