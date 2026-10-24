@@ -91,7 +91,7 @@ def correct_writing(text: str) -> dict:
             category = item.get("category", "other")
             if not all(isinstance(value, str) and value.strip() for value in (original, correction, explanation)):
                 continue
-            category = category if category in allowed_categories else "other"
+            category = category if isinstance(category, str) and category in allowed_categories else "other"
             mistakes.append({
                 "original": original.strip(),
                 "correction": correction.strip(),
