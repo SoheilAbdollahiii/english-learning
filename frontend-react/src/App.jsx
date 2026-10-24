@@ -2562,7 +2562,7 @@ export default function App() {
                     <p className={`mt-2 text-xs ${darkMode ? 'text-indigo-200' : 'text-indigo-700'}`}>{t('writing_prompt_hint')}</p>
                   </div>
                   {writingNotice && (
-                    <div role="status" className={`mb-4 rounded-xl border p-3 text-sm ${writingNotice.type === 'success' ? (darkMode ? 'border-emerald-800 bg-emerald-950/40 text-emerald-200' : 'border-emerald-200 bg-emerald-50 text-emerald-800') : writingNotice.type === 'error' ? (darkMode ? 'border-rose-800 bg-rose-950/40 text-rose-200' : 'border-rose-200 bg-rose-50 text-rose-800') : (darkMode ? 'border-amber-800 bg-amber-950/40 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800')}>
+                    <div role="status" className={`mb-4 rounded-xl border p-3 text-sm ${writingNotice.type === 'success' ? (darkMode ? 'border-emerald-800 bg-emerald-950/40 text-emerald-200' : 'border-emerald-200 bg-emerald-50 text-emerald-800') : writingNotice.type === 'error' ? (darkMode ? 'border-rose-800 bg-rose-950/40 text-rose-200' : 'border-rose-200 bg-rose-50 text-rose-800') : (darkMode ? 'border-amber-800 bg-amber-950/40 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800')}`}
                       <div className="flex items-start justify-between gap-3">
                         <span>{t(writingNotice.key)}</span>
                         <button type="button" onClick={() => setWritingNotice(null)} className="shrink-0 font-bold opacity-70 hover:opacity-100" aria-label={t('dismiss_notice')}>×</button>
