@@ -119,6 +119,17 @@ class CorrectWritingTests(SimpleTestCase):
             correct_writing("I go home yesterday.")
         self.assertEqual(raised.exception.code, "invalid_api_key")
 
+    @patch("rag.services.retrieve_grammar_rule", return_value="Past simple rule")
+    @patch("rag.services.Groq")
+    @override_settings(GROQ_API_KEY="test-key", GROQ_MODEL="openai/gpt-oss-120b")
+    def test_classifies_model_permission_forbidden_response(self, groq_cls, _retrieve):
+        error = RuntimeError("model is blocked by project permissions")
+        error.status_code = 403
+        groq_cls.return_value.chat.completions.create.side_effect = error
+        with self.assertRaises(CorrectionUnavailable) as raised:
+            correct_writing("I go home yesterday.")
+        self.assertEqual(raised.exception.code, "model_permission_denied")
+
 
 
 class ConversationServiceTests(SimpleTestCase):
