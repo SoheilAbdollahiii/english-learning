@@ -121,4 +121,4 @@ The React app does not assume that the Django API runs on the same machine as th
 
 - The dashboard's streak and seven-day activity chart use per-user quiz-session statistics from the API, not login dates or a capped recent-history list. They measure quiz sessions, not every possible learning action.
 - Before public launch, configure HTTPS and review Django's deployment checks, token storage/XSS exposure, configure a shared production cache (such as Redis) so throttles work across multiple workers, backups, privacy/retention terms, monitoring, and the current npm audit findings.
-- A passing CI build validates the automated checks; it does not replace a real-browser acceptance test with a configured API key and production-like environment.
+- A passing CI build validates the automated checks; it does not replace a real-browser acceptance test with a configured API key and production-like environment..
